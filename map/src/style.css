@@ -1,0 +1,60 @@
+/* speciesmap.org — global styles */
+/* Theme: Slate & Sage */
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+:root {
+  /* Palette */
+  --color-bg:           #f0ece0;
+  --color-bg-sidebar:   #dedad0;
+  --color-bg-panel:     #f0ece0;
+  --color-bg-card:      #e8e4d8;
+  --color-border:       rgba(0, 0, 0, 0.09);
+
+  --color-text-primary:   #2a2418;
+  --color-text-secondary: #706050;
+  --color-text-muted:     #a09080;
+
+  /* Species class colours */
+  --color-mammal:    #b05828;
+  --color-bird:      #4880a8;
+  --color-reptile:   #6a9848;
+  --color-amphibian: #8858b0;
+
+  /* IUCN status colours */
+  --color-cr: #c02020;
+  --color-en: #c05010;
+  --color-vu: #a08010;
+  --color-lc: #3a6818;
+
+  /* Glow styles */
+  --glow-mammal:    0 0 8px rgba(176, 88, 40, 0.35), 0 0 20px rgba(176, 88, 40, 0.15);
+  --glow-bird:      0 0 8px rgba(72, 128, 168, 0.35), 0 0 20px rgba(72, 128, 168, 0.15);
+  --glow-reptile:   0 0 8px rgba(106, 152, 72, 0.35), 0 0 20px rgba(106, 152, 72, 0.15);
+  --glow-amphibian: 0 0 8px rgba(136, 88, 176, 0.35), 0 0 20px rgba(136, 88, 176, 0.15);
+  --glow-cr:        0 0 6px rgba(192, 32, 32, 0.3),   0 0 14px rgba(192, 32, 32, 0.12);
+  --glow-en:        0 0 6px rgba(192, 80, 16, 0.3),   0 0 14px rgba(192, 80, 16, 0.12);
+  --glow-vu:        0 0 6px rgba(160, 128, 16, 0.3),  0 0 14px rgba(160, 128, 16, 0.1);
+  --glow-lc:        0 0 6px rgba(58, 104, 24, 0.28),  0 0 14px rgba(58, 104, 24, 0.1);
+  --glow-stat:      0 0 8px rgba(106, 152, 72, 0.4),  0 0 20px rgba(106, 152, 72, 0.15);
+
+  /* Typography */
+  --font-sans:  system-ui, -apple-system, sans-serif;
+  --font-serif: Georgia, serif;
+  --font-mono:  'Courier New', monospace;
+}
+
+html, body, #app {
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+  font-family: var(--font-sans);
+  background: var(--color-bg);
+  color: var(--color-text-primary);
+  font-size: 14px;
+  line-height: 1.5;
+}

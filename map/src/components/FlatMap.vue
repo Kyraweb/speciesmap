@@ -21,6 +21,7 @@
 import { ref, onMounted, onUnmounted, watch } from 'vue'
 import * as maptilersdk from '@maptiler/sdk'
 import '@maptiler/sdk/dist/maptiler-sdk.css'
+import { useContinent } from '../composables/useContinent'
 
 const props = defineProps({
   sightings:     { type: Array,  default: () => [] },
@@ -29,10 +30,32 @@ const props = defineProps({
 
 const emit = defineEmits(['select-species'])
 
+const { slug } = useContinent()
 const mapContainer = ref(null)
 const popup        = ref(null)
 let map            = null
 let markers        = []
+
+// Continent bounding boxes [minLng, minLat, maxLng, maxLat]
+// Slightly padded beyond the data bounds so the edge feels natural
+const CONTINENT_BOUNDS = {
+  northamerica: [-172.0,   5.0,  -48.0,  86.0],
+  southamerica: [ -85.0, -58.0,  -30.0,  15.0],
+  europe:       [ -28.0,  32.0,   48.0,  74.0],
+  africa:       [ -20.0, -37.0,   54.0,  40.0],
+  asia:         [  24.0,  -1.0,  182.0,  80.0],
+  australia:    [ 110.0, -47.0,  157.0,  -8.0],
+}
+
+// Continent centre points and default zoom
+const CONTINENT_VIEW = {
+  northamerica: { center: [-98.0,  45.0], zoom: 3   },
+  southamerica: { center: [-58.0, -20.0], zoom: 3   },
+  europe:       { center: [ 10.0,  54.0], zoom: 3.5 },
+  africa:       { center: [ 18.0,   2.0], zoom: 3   },
+  asia:         { center: [ 95.0,  40.0], zoom: 2.5 },
+  australia:    { center: [134.0, -27.0], zoom: 3.5 },
+}
 
 // Class colours — Slate & Sage palette
 const CLASS_COLORS = {
@@ -114,14 +137,18 @@ function plotSightings() {
 onMounted(() => {
   maptilersdk.config.apiKey = import.meta.env.VITE_MAPTILER_KEY ?? ''
 
+  const bounds = CONTINENT_BOUNDS[slug] ?? CONTINENT_BOUNDS.northamerica
+  const view   = CONTINENT_VIEW[slug]   ?? CONTINENT_VIEW.northamerica
+
   map = new maptilersdk.Map({
     container:   mapContainer.value,
     style:       maptilersdk.MapStyle.OUTDOOR,
-    center:      [-98, 45],    // Centre of North America
-    zoom:        3,
+    center:      view.center,
+    zoom:        view.zoom,
     minZoom:     2,
     maxZoom:     14,
-    projection:  'mercator',   // Flat map — not globe
+    maxBounds:   bounds,
+    projection:  'mercator',
     attributionControl: false,
   })
 

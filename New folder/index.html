@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="A living atlas of land wildlife — mapping sightings, migration routes, and conservation status across every continent." />
+  <title>speciesmap.org — A living atlas of land wildlife</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:          #f0ece0;
+      --bg-nav:      #e8e4d8;
+      --bg-card:     #e8e4d8;
+      --bg-terrain:  #ccd4bc;
+      --text:        #2a2418;
+      --text-mid:    #605040;
+      --text-muted:  #a09080;
+      --rust:        #b05828;
+      --sage:        #6a9848;
+      --border:      rgba(0,0,0,0.09);
+      --font-serif:  Georgia, serif;
+      --font-sans:   system-ui, -apple-system, sans-serif;
+    }
+
+    html, body { background: var(--bg); color: var(--text); font-family: var(--font-sans); }
+
+    /* NAV */
+    nav {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 32px; height: 52px;
+      background: var(--bg-nav); border-bottom: 0.5px solid var(--border);
+    }
+    .logo { font-family: var(--font-serif); font-size: 16px; color: var(--text); }
+    .logo b { color: var(--rust); font-weight: normal; }
+    .nav-links { display: flex; gap: 24px; }
+    .nav-links a { font-size: 12px; color: var(--text-muted); text-decoration: none; }
+    .nav-links a:hover { color: var(--text); }
+
+    /* HERO */
+    .hero {
+      padding: 64px 32px 56px;
+      display: flex; flex-direction: column; align-items: center; text-align: center;
+      border-bottom: 0.5px solid var(--border);
+    }
+    .eyebrow {
+      font-size: 11px; letter-spacing: 1.2px; color: var(--rust);
+      text-transform: uppercase; margin-bottom: 20px;
+    }
+    h1 {
+      font-family: var(--font-serif); font-size: 42px; font-weight: normal;
+      color: var(--text); line-height: 1.15; max-width: 580px; margin-bottom: 18px;
+    }
+    h1 em { color: var(--rust); font-style: normal; }
+    .sub {
+      font-size: 15px; color: var(--text-mid); line-height: 1.7;
+      max-width: 460px; margin-bottom: 40px;
+    }
+
+    /* HERO MAP */
+    .hero-map {
+      width: 100%; max-width: 680px; height: 200px;
+      background: var(--bg-card); border-radius: 12px;
+      border: 0.5px solid var(--border); overflow: hidden;
+      margin-bottom: 40px; position: relative;
+    }
+    .hero-map-label {
+      position: absolute; top: 10px; left: 12px;
+      font-size: 9px; letter-spacing: 0.8px; color: var(--text-muted); text-transform: uppercase;
+    }
+
+    /* CONTINENT SELECTOR */
+    .continent-section {
+      padding: 40px 32px 56px; border-bottom: 0.5px solid var(--border);
+    }
+    .section-label {
+      font-size: 10px; letter-spacing: 1px; color: var(--text-muted);
+      text-transform: uppercase; text-align: center; margin-bottom: 20px;
+    }
+    .continent-grid {
+      display: grid; grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px; max-width: 600px; margin: 0 auto;
+    }
+    .continent-card {
+      background: var(--bg-card); border: 0.5px solid var(--border);
+      border-radius: 12px; padding: 16px 14px;
+      display: flex; flex-direction: column; align-items: center;
+      gap: 8px; text-align: center; text-decoration: none;
+      transition: border-color 0.15s, background 0.15s;
+    }
+    .continent-card:hover { background: #f5f0e4; border-color: rgba(176,88,40,0.35); }
+    .continent-card.soon { opacity: 0.5; pointer-events: none; }
+    .cc-icon { width: 40px; height: 28px; }
+    .cc-name { font-size: 12px; font-weight: 500; color: var(--text); }
+    .cc-count { font-size: 10px; color: var(--text-muted); }
+    .cc-badge {
+      font-size: 9px; padding: 2px 6px; border-radius: 3px;
+      background: #eaf3de; color: #3b6d11;
+    }
+    .cc-soon {
+      font-size: 9px; padding: 2px 6px; border-radius: 3px;
+      background: #f1efe8; color: var(--text-muted);
+    }
+
+    /* ABOUT */
+    .about {
+      padding: 52px 32px; border-bottom: 0.5px solid var(--border);
+      max-width: 620px; margin: 0 auto;
+    }
+    h2 {
+      font-family: var(--font-serif); font-size: 26px; font-weight: normal;
+      color: var(--text); margin-bottom: 14px; line-height: 1.3;
+    }
+    p { font-size: 14px; color: var(--text-mid); line-height: 1.75; margin-bottom: 12px; }
+    p:last-child { margin-bottom: 0; }
+
+    /* HOW IT WORKS */
+    .how { padding: 52px 32px; border-bottom: 0.5px solid var(--border); }
+    .how h2 { text-align: center; margin-bottom: 36px; }
+    .steps {
+      display: grid; grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 0; max-width: 680px; margin: 0 auto 40px;
+    }
+    .step { padding: 20px 20px; }
+    .step:nth-child(2) {
+      border-left: 0.5px solid var(--border);
+      border-right: 0.5px solid var(--border);
+    }
+    .step-num {
+      font-size: 10px; letter-spacing: 1px; color: var(--rust);
+      text-transform: uppercase; margin-bottom: 10px;
+    }
+    .step-title {
+      font-family: var(--font-serif); font-size: 15px;
+      color: var(--text); margin-bottom: 8px;
+    }
+    .step-body { font-size: 12px; color: var(--text-mid); line-height: 1.6; }
+
+    /* SOURCES */
+    .sources { max-width: 680px; margin: 0 auto; padding: 0 32px; }
+    .source-pills { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+    .source-pill {
+      font-size: 11px; padding: 5px 12px; border-radius: 20px;
+      background: var(--bg-card); border: 0.5px solid var(--border); color: var(--text-mid);
+    }
+
+    /* STATS BAR */
+    .stats-bar {
+      display: flex; justify-content: center;
+      border-top: 0.5px solid var(--border); border-bottom: 0.5px solid var(--border);
+      margin-top: 52px;
+    }
+    .stat-item {
+      flex: 1; max-width: 160px; padding: 20px 16px; text-align: center;
+      border-right: 0.5px solid var(--border);
+    }
+    .stat-item:last-child { border-right: none; }
+    .stat-num {
+      font-family: var(--font-serif); font-size: 26px; color: var(--rust); line-height: 1;
+    }
+    .stat-lbl { font-size: 10px; color: var(--text-muted); margin-top: 4px; }
+
+    /* FOOTER */
+    footer {
+      padding: 24px 32px; display: flex; align-items: center;
+      justify-content: space-between;
+      background: var(--bg-nav); border-top: 0.5px solid var(--border);
+    }
+    .footer-logo { font-family: var(--font-serif); font-size: 13px; color: var(--text-muted); }
+    .footer-logo b { color: #c08060; font-weight: normal; }
+    .footer-note { font-size: 11px; color: var(--text-muted); }
+
+    /* RESPONSIVE */
+    @media (max-width: 600px) {
+      h1 { font-size: 28px; }
+      .continent-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .steps { grid-template-columns: 1fr; }
+      .step:nth-child(2) { border: none; border-top: 0.5px solid var(--border); border-bottom: 0.5px solid var(--border); }
+      nav { padding: 0 16px; }
+      .nav-links { display: none; }
+      .hero { padding: 40px 16px 40px; }
+      .about { padding: 40px 16px; }
+      .how { padding: 40px 16px; }
+    }
+  </style>
+</head>
+<body>
+
+  <nav>
+    <div class="logo">species<b>map</b></div>
+    <div class="nav-links">
+      <a href="#about">About</a>
+      <a href="#how">Data sources</a>
+      <a href="https://api.speciesmap.org/docs" target="_blank">API</a>
+    </div>
+  </nav>
+
+  <!-- HERO -->
+  <div class="hero">
+    <div class="eyebrow">Global wildlife tracking</div>
+    <h1>Every sighting tells<br>a <em>story</em> about our planet</h1>
+    <p class="sub">A living atlas of land wildlife — drawing from the world's leading scientific databases to map where animals move, thrive, and disappear.</p>
+
+    <div class="hero-map">
+      <div class="hero-map-label">Preview — North America</div>
+      <svg width="100%" height="100%" viewBox="0 0 680 200" preserveAspectRatio="xMidYMid slice">
+        <rect width="680" height="200" fill="#dedad0"/>
+        <g stroke="rgba(160,155,140,0.3)" stroke-width="0.4">
+          <line x1="0" y1="50" x2="680" y2="50"/><line x1="0" y1="100" x2="680" y2="100"/>
+          <line x1="0" y1="150" x2="680" y2="150"/>
+          <line x1="136" y1="0" x2="136" y2="200"/><line x1="272" y1="0" x2="272" y2="200"/>
+          <line x1="408" y1="0" x2="408" y2="200"/><line x1="544" y1="0" x2="544" y2="200"/>
+        </g>
+        <path d="M100,5 L180,2 L280,6 L360,4 L430,10 L478,22 L510,40 L525,62 L520,88 L505,110 L486,130 L468,150 L448,165 L422,175 L392,178 L360,174 L328,164 L298,154 L268,157 L242,168 L218,174 L192,170 L164,158 L138,142 L112,120 L88,96 L70,72 L58,48 L55,26 L68,12 Z" fill="#ccd4bc" stroke="rgba(110,130,90,0.5)" stroke-width="0.8"/>
+        <path d="M88,96 Q140,108 168,138 Q194,164 222,174" stroke="#4880a8" stroke-width="1.2" stroke-dasharray="4,3" fill="none" opacity="0.5"/>
+        <circle cx="148" cy="88" r="6" fill="#b05828" stroke="#804018" stroke-width="0.7"/>
+        <circle cx="260" cy="78" r="5.5" fill="#b05828" stroke="#804018" stroke-width="0.7"/>
+        <circle cx="188" cy="118" r="5.5" fill="#b05828" stroke="#804018" stroke-width="0.7"/>
+        <circle cx="340" cy="95" r="5.5" fill="#b05828" stroke="#804018" stroke-width="0.7"/>
+        <circle cx="88" cy="96" r="5.5" fill="#4880a8" stroke="#285878" stroke-width="0.7"/>
+        <circle cx="222" cy="174" r="5.5" fill="#4880a8" stroke="#285878" stroke-width="0.7"/>
+        <circle cx="400" cy="160" r="5.5" fill="#4880a8" stroke="#285878" stroke-width="0.7"/>
+        <circle cx="305" cy="130" r="5.5" fill="#6a9848" stroke="#3a6020" stroke-width="0.7"/>
+        <circle cx="420" cy="108" r="5.5" fill="#6a9848" stroke="#3a6020" stroke-width="0.7"/>
+        <circle cx="148" cy="88" r="11" fill="rgba(176,88,40,0.12)"/>
+        <g transform="translate(652,178)" opacity="0.35">
+          <line x1="0" y1="-9" x2="0" y2="9" stroke="#6a7860" stroke-width="0.8"/>
+          <line x1="-9" y1="0" x2="9" y2="0" stroke="#6a7860" stroke-width="0.8"/>
+          <text x="-2" y="-11" font-size="7" fill="#6a7860">N</text>
+        </g>
+        <rect x="8" y="180" width="60" height="1" fill="#a0a090"/>
+        <text x="10" y="194" font-size="8" fill="#a0a090">500 km</text>
+        <rect x="8" y="8" width="54" height="14" rx="3" fill="rgba(240,236,224,0.85)"/>
+        <circle cx="16" cy="15" r="3.5" fill="#b05828"/><text x="23" y="18" font-size="8" fill="#706050">Mammals</text>
+        <rect x="8" y="25" width="46" height="14" rx="3" fill="rgba(240,236,224,0.85)"/>
+        <circle cx="16" cy="32" r="3.5" fill="#4880a8"/><text x="23" y="35" font-size="8" fill="#706050">Birds</text>
+        <rect x="8" y="42" width="48" height="14" rx="3" fill="rgba(240,236,224,0.85)"/>
+        <circle cx="16" cy="49" r="3.5" fill="#6a9848"/><text x="23" y="52" font-size="8" fill="#706050">Reptiles</text>
+      </svg>
+    </div>
+  </div>
+
+  <!-- CONTINENT SELECTOR -->
+  <div class="continent-section">
+    <div class="section-label">Choose a continent to explore</div>
+    <div class="continent-grid">
+      <a href="https://northamerica.speciesmap.org" class="continent-card">
+        <svg class="cc-icon" viewBox="0 0 40 28" fill="none">
+          <path d="M8,3 L16,2 L24,3 L30,5 L34,9 L35,14 L32,19 L28,23 L22,26 L16,25 L10,22 L6,17 L4,11 L5,6 Z" fill="#ccd4bc" stroke="#8a9878" stroke-width="0.8"/>
+        </svg>
+        <div class="cc-name">North America</div>
+        <div class="cc-count">342 species · 7,225 sightings</div>
+        <div class="cc-badge">Available</div>
+      </a>
+      <div class="continent-card soon">
+        <svg class="cc-icon" viewBox="0 0 40 28" fill="none">
+          <path d="M10,8 L18,5 L26,7 L32,12 L34,18 L30,23 L22,26 L14,24 L8,18 L7,12 Z" fill="#d8d4c4" stroke="#b0a890" stroke-width="0.8"/>
+        </svg>
+        <div class="cc-name">South America</div>
+        <div class="cc-count">Coming next</div>
+        <div class="cc-soon">Soon</div>
+      </div>
+      <div class="continent-card soon">
+        <svg class="cc-icon" viewBox="0 0 40 28" fill="none">
+          <path d="M12,6 L20,4 L28,6 L33,11 L32,17 L27,22 L19,24 L12,21 L8,15 L9,9 Z" fill="#d8d4c4" stroke="#b0a890" stroke-width="0.8"/>
+        </svg>
+        <div class="cc-name">Europe</div>
+        <div class="cc-count">Coming soon</div>
+        <div class="cc-soon">Soon</div>
+      </div>
+      <div class="continent-card soon">
+        <svg class="cc-icon" viewBox="0 0 40 28" fill="none">
+          <path d="M10,5 L20,3 L30,6 L35,12 L33,19 L26,24 L16,25 L8,20 L6,13 Z" fill="#d8d4c4" stroke="#b0a890" stroke-width="0.8"/>
+        </svg>
+        <div class="cc-name">Africa</div>
+        <div class="cc-count">Coming soon</div>
+        <div class="cc-soon">Soon</div>
+      </div>
+      <div class="continent-card soon">
+        <svg class="cc-icon" viewBox="0 0 40 28" fill="none">
+          <path d="M8,6 L18,3 L28,5 L34,10 L35,17 L30,23 L20,26 L10,23 L5,16 L6,9 Z" fill="#d8d4c4" stroke="#b0a890" stroke-width="0.8"/>
+        </svg>
+        <div class="cc-name">Asia</div>
+        <div class="cc-count">Coming soon</div>
+        <div class="cc-soon">Soon</div>
+      </div>
+      <div class="continent-card soon">
+        <svg class="cc-icon" viewBox="0 0 40 28" fill="none">
+          <path d="M10,7 L20,4 L30,7 L35,13 L33,20 L24,25 L14,24 L7,18 L7,11 Z" fill="#d8d4c4" stroke="#b0a890" stroke-width="0.8"/>
+        </svg>
+        <div class="cc-name">Australia</div>
+        <div class="cc-count">Coming soon</div>
+        <div class="cc-soon">Soon</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ABOUT -->
+  <div class="about" id="about">
+    <h2>Wildlife doesn't respect borders.<br>Neither does this map.</h2>
+    <p>SpeciesMap is an open platform that brings together sighting records, GPS tracking data, and conservation assessments from the world's leading scientific databases — in one place, with one interface.</p>
+    <p>We don't collect data. We connect it. Every sighting you see is sourced from GBIF, Movebank, eBird, or the IUCN Red List — then normalised, mapped, and made navigable for anyone from a curious school student to a field researcher.</p>
+    <p>This is a passion project, built in the open. It started as a curiosity about where the data actually is — and became a mission to make it visible.</p>
+  </div>
+
+  <!-- HOW IT WORKS -->
+  <div class="how" id="how">
+    <h2>How it works</h2>
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">01 — Collect</div>
+        <div class="step-title">Data from the source</div>
+        <p class="step-body">We pull sighting records, GPS collar data, and range polygons directly from GBIF, Movebank, eBird, and the IUCN Red List. Updated regularly.</p>
+      </div>
+      <div class="step">
+        <div class="step-num">02 — Normalise</div>
+        <div class="step-title">One schema, all species</div>
+        <p class="step-body">Each source formats data differently. We map everything into a unified PostGIS schema — species, location, date, class, conservation status — so it's queryable as one.</p>
+      </div>
+      <div class="step">
+        <div class="step-num">03 — Visualise</div>
+        <div class="step-title">Maps that move</div>
+        <p class="step-body">Interactive terrain maps with animated migration routes, species range overlays, seasonal activity charts, and IUCN conservation status — built for exploration.</p>
+      </div>
+    </div>
+    <div class="sources">
+      <div class="section-label">Data sources</div>
+      <div class="source-pills">
+        <span class="source-pill">GBIF</span>
+        <span class="source-pill">Movebank</span>
+        <span class="source-pill">eBird — Cornell Lab</span>
+        <span class="source-pill">IUCN Red List</span>
+        <span class="source-pill">iNaturalist</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- STATS BAR -->
+  <div class="stats-bar">
+    <div class="stat-item"><div class="stat-num">342</div><div class="stat-lbl">Species tracked</div></div>
+    <div class="stat-item"><div class="stat-num">7,225</div><div class="stat-lbl">Sightings mapped</div></div>
+    <div class="stat-item"><div class="stat-num">4</div><div class="stat-lbl">Data sources</div></div>
+    <div class="stat-item"><div class="stat-num">1</div><div class="stat-lbl">Continent live</div></div>
+  </div>
+
+  <footer>
+    <div class="footer-logo">species<b>map</b>.org</div>
+    <div class="footer-note">Open data. Open platform. Built with care.</div>
+  </footer>
+
+</body>
+</html>

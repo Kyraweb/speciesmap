@@ -28,8 +28,11 @@
       </aside>
 
       <main class="map-area">
-        <!-- Map will mount here -->
-        <div id="map" ref="mapContainer"></div>
+        <FlatMap
+          :sightings="sightings"
+          :selected-class="selectedClass"
+          @select-species="selectedSpecies = $event"
+        />
       </main>
 
       <DetailPanel
@@ -47,6 +50,7 @@ import { useApi } from './composables/useApi'
 import { useContinent } from './composables/useContinent'
 import Sidebar from './components/Sidebar.vue'
 import DetailPanel from './components/DetailPanel.vue'
+import FlatMap from './components/FlatMap.vue'
 
 const { get, continent } = useApi()
 const { slug: currentSlug } = useContinent()

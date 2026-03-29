@@ -77,7 +77,7 @@ async function loadSightings() {
   try {
     sightings.value = await get('/api/sightings', {
       class: selectedClass.value,
-      limit: 500,
+      limit: 2000,
     })
   } catch (e) {
     console.error('Failed to load sightings:', e)

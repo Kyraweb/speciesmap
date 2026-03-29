@@ -50,7 +50,7 @@ def get_sightings(
         query += " AND si.species_id = %s"
         params.append(species_id)
 
-    query += " ORDER BY si.observed_at DESC LIMIT %s"
+    query += " ORDER BY RANDOM() LIMIT %s"
     params.append(limit)
 
     cur.execute(query, params)

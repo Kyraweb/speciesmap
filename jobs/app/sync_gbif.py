@@ -59,6 +59,9 @@ def fetch_page(last_sync, offset, class_name):
         "offset":             offset,
     }
     resp = requests.get(GBIF_API, params=params, timeout=30)
+            if resp.status_code == 400:
+                print(f"      GBIF pagination limit reached at offset {offset} — treating as end of records")
+                return {"results": [], "endOfRecords": True}
     resp.raise_for_status()
     return resp.json()
 
@@ -234,10 +237,8 @@ def main():
                 print(f"  Got {len(records)} records from GBIF")
 
                 for record in records:
-                    # Extra safety — skip if class doesn't match target
+                    # Skip silently if class doesn't match — GBIF taxonomy mismatches are common
                     if record.get("class") not in TARGET_CLASSES:
-                        reject_record(conn, record, "wrong_class")
-                        total_rejected += 1
                         continue
 
                     total_fetched += 1

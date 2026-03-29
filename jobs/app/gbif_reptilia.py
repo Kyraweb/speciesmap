@@ -1,11 +1,12 @@
 """
 speciesmap.org — GBIF sync worker — Reptilia
 Runs as a Coolify scheduled task — Sunday 5am UTC
-Fetches Reptilia sightings from GBIF for North America.
+Fetches Squamata, Testudines, Crocodylia from GBIF for North America.
+GBIF does not use Reptilia as a class — uses orders instead.
 """
 
 import os
-import sys
+import time
 import requests
 import psycopg2
 import psycopg2.extras
@@ -14,12 +15,12 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-DATABASE_URL  = os.getenv("DATABASE_URL")
-GBIF_API      = "https://api.gbif.org/v1/occurrence/search"
-SOURCE_ID     = 1
-CONTINENT     = "NORTH_AMERICA"
-BATCH_SIZE    = 300
-CLASS_NAME    = "Reptilia"
+DATABASE_URL    = os.getenv("DATABASE_URL")
+GBIF_API        = "https://api.gbif.org/v1/occurrence/search"
+SOURCE_ID       = 1
+CONTINENT       = "NORTH_AMERICA"
+BATCH_SIZE      = 300
+REPTILE_ORDERS  = ["Squamata", "Testudines", "Crocodylia"]
 
 
 def get_connection():
@@ -42,7 +43,7 @@ def get_last_sync(conn):
     return (datetime.utcnow() - timedelta(days=30)).strftime("%Y-%m-%d")
 
 
-def fetch_page(last_sync, offset):
+def fetch_page(last_sync, offset, order_name):
     today = datetime.utcnow().strftime("%Y-%m-%d")
     params = {
         "continent":          CONTINENT,
@@ -50,7 +51,7 @@ def fetch_page(last_sync, offset):
         "hasCoordinate":      "true",
         "hasGeospatialIssue": "false",
         "kingdom":            "Animalia",
-        "class":              CLASS_NAME,
+        "order":              order_name,
         "lastInterpreted":    f"{last_sync},{today}",
         "limit":              BATCH_SIZE,
         "offset":             offset,
@@ -67,21 +68,20 @@ def fetch_page(last_sync, offset):
             if attempt == 2:
                 raise
             print(f"      Retry {attempt + 1}/3 after error: {e}")
-            import time
             time.sleep(10)
 
 
 def upsert_species(conn, record):
     cur = conn.cursor()
+    # Store as Reptilia for our display purposes
     cur.execute("""
         INSERT INTO species (scientific_name, common_name, class, order_name, family, genus)
-        VALUES (%s, %s, %s, %s, %s, %s)
+        VALUES (%s, %s, 'Reptilia', %s, %s, %s)
         ON CONFLICT (scientific_name) DO NOTHING
         RETURNING id
     """, [
         record.get("species", record.get("scientificName", "Unknown")),
         record.get("vernacularName"),
-        record.get("class"),
         record.get("order"),
         record.get("family"),
         record.get("genus"),
@@ -189,9 +189,61 @@ def update_last_synced(conn):
     cur.close()
 
 
+def sync_order(conn, order_name, last_sync):
+    print(f"\n  --- Syncing order: {order_name} ---")
+    total_fetched  = 0
+    total_inserted = 0
+    total_skipped  = 0
+    total_rejected = 0
+    offset = 0
+
+    while True:
+        print(f"  Fetching {order_name} offset {offset}...")
+        data = fetch_page(last_sync, offset, order_name)
+        records = data.get("results", [])
+
+        if not records:
+            print(f"  No more {order_name} records.")
+            break
+
+        print(f"  Got {len(records)} records from GBIF")
+
+        for record in records:
+            total_fetched += 1
+
+            valid, reason = validate_record(record)
+            if not valid:
+                reject_record(conn, record, reason)
+                total_rejected += 1
+                continue
+
+            species_id = upsert_species(conn, record)
+            if not species_id:
+                reject_record(conn, record, "species_insert_failed")
+                total_rejected += 1
+                continue
+
+            inserted = insert_sighting(conn, record, species_id)
+            if inserted:
+                total_inserted += 1
+            else:
+                total_skipped += 1
+
+        conn.commit()
+
+        if data.get("endOfRecords", True):
+            break
+
+        offset += BATCH_SIZE
+
+    print(f"  {order_name} done — fetched: {total_fetched}, inserted: {total_inserted}, skipped: {total_skipped}")
+    return total_fetched, total_inserted, total_skipped, total_rejected
+
+
 def main():
     print("=" * 50)
-    print(f"  speciesmap.org — GBIF sync: Reptilia")
+    print("  speciesmap.org — GBIF sync: Reptilia")
+    print(f"  Orders: {', '.join(REPTILE_ORDERS)}")
     print(f"  Started: {datetime.utcnow().isoformat()}")
     print("=" * 50)
 
@@ -208,57 +260,19 @@ def main():
 
     last_sync = get_last_sync(conn)
     print(f"\n  Last sync: {last_sync}")
-    print(f"  Class: Reptilia")
 
     total_fetched  = 0
     total_inserted = 0
     total_skipped  = 0
     total_rejected = 0
-    offset = 0
 
     try:
-        while True:
-            print(f"\n  Fetching Reptilia offset {offset}...")
-            data = fetch_page(last_sync, offset)
-            records = data.get("results", [])
-
-            if not records:
-                print("  No more records.")
-                break
-
-            print(f"  Got {len(records)} records from GBIF")
-
-            for record in records:
-                # Skip silently if class doesn't match
-                if record.get("class") != CLASS_NAME:
-                    continue
-
-                total_fetched += 1
-
-                valid, reason = validate_record(record)
-                if not valid:
-                    reject_record(conn, record, reason)
-                    total_rejected += 1
-                    continue
-
-                species_id = upsert_species(conn, record)
-                if not species_id:
-                    reject_record(conn, record, "species_insert_failed")
-                    total_rejected += 1
-                    continue
-
-                inserted = insert_sighting(conn, record, species_id)
-                if inserted:
-                    total_inserted += 1
-                else:
-                    total_skipped += 1
-
-            conn.commit()
-
-            if data.get("endOfRecords", True):
-                break
-
-            offset += BATCH_SIZE
+        for order_name in REPTILE_ORDERS:
+            f, i, s, r = sync_order(conn, order_name, last_sync)
+            total_fetched  += f
+            total_inserted += i
+            total_skipped  += s
+            total_rejected += r
 
         update_last_synced(conn)
         log_run(conn, run_id, total_fetched, total_inserted, total_skipped, total_rejected, "success")
@@ -266,14 +280,16 @@ def main():
 
     except Exception as e:
         print(f"\n  ERROR: {e}")
-        log_run(conn, run_id, total_fetched, total_inserted, total_skipped, total_rejected, "failed", str(e))
+        try:
+            log_run(conn, run_id, total_fetched, total_inserted, total_skipped, total_rejected, "failed", str(e))
+        except Exception:
+            pass
         status = "failed"
 
     finally:
         conn.close()
 
     print(f"\n  {'='*48}")
-    print(f"  Class:    Reptilia")
     print(f"  Status:   {status}")
     print(f"  Fetched:  {total_fetched}")
     print(f"  Inserted: {total_inserted}")

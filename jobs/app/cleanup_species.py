@@ -15,7 +15,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 DATABASE_URL   = os.getenv("DATABASE_URL")
-TARGET_CLASSES = ('Mammalia', 'Aves', 'Reptilia', 'Amphibia')
+TARGET_CLASSES = ('Mammalia', 'Aves', 'Reptilia', 'Amphibia', 'Squamata', 'Testudines', 'Crocodylia')
 
 
 def get_connection():

@@ -6,21 +6,29 @@
         <button class="xbtn" @click="$emit('close')">✕</button>
       </div>
       <div class="dbody">
-        <div class="dname">{{ species.common_name }}</div>
-        <div class="dlatin">{{ species.scientific_name }}</div>
+        <div class="dname">{{ species.common_name || species.scientific_name }}</div>
+        <div class="dlatin" v-if="species.common_name">{{ species.scientific_name }}</div>
         <div class="dtags">
-          <span class="tag" :style="iucnStyle(species.iucn_status)">
+          <span v-if="species.iucn_status" class="tag" :style="iucnStyle(species.iucn_status)">
             {{ species.iucn_status }} {{ iucnLabel(species.iucn_status) }}
           </span>
           <span class="tag class-tag">{{ species.class }}</span>
         </div>
         <div class="drow">
           <span class="dlabel">Sightings</span>
-          <span class="dval">{{ species.sighting_count ?? '—' }}</span>
+          <span class="dval">{{ species.individual_count ?? 1 }} recorded</span>
+        </div>
+        <div class="drow">
+          <span class="dlabel">Country</span>
+          <span class="dval">{{ species.country ?? '—' }}</span>
         </div>
         <div class="drow">
           <span class="dlabel">Last seen</span>
-          <span class="dval">{{ formatDate(species.last_seen) }}</span>
+          <span class="dval">{{ formatDate(species.observed_at) }}</span>
+        </div>
+        <div class="drow">
+          <span class="dlabel">Coordinates</span>
+          <span class="dval">{{ species.lat?.toFixed(3) }}, {{ species.lng?.toFixed(3) }}</span>
         </div>
         <div class="drow">
           <span class="dlabel">Source</span>
@@ -87,6 +95,7 @@ function formatDate(date) {
   padding: 10px 13px;
   border-bottom: 0.5px solid var(--color-border);
   background: var(--color-bg-sidebar);
+  flex-shrink: 0;
 }
 .dheadtitle { font-size: 12px; color: var(--color-text-muted); }
 .xbtn {
@@ -110,8 +119,9 @@ function formatDate(date) {
   font-family: var(--font-serif);
   font-size: 16px;
   color: var(--color-text-primary);
-  text-shadow: var(--glow-mammal);
+  text-shadow: 0 0 8px rgba(176, 88, 40, 0.3), 0 0 20px rgba(176, 88, 40, 0.12);
   margin-bottom: 3px;
+  line-height: 1.3;
 }
 .dlatin {
   font-size: 11px;
@@ -131,5 +141,5 @@ function formatDate(date) {
   font-size: 12px;
 }
 .dlabel { color: var(--color-text-muted); }
-.dval { color: var(--color-text-primary); font-weight: 500; }
+.dval { color: var(--color-text-primary); font-weight: 500; text-align: right; max-width: 150px; }
 </style>

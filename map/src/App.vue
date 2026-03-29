@@ -31,12 +31,11 @@
         <FlatMap
           :sightings="sightings"
           :selected-class="selectedClass"
-          @select-species="selectedSpecies = $event"
+          @select-species="onSelectSpecies"
         />
       </main>
 
       <DetailPanel
-        v-if="selectedSpecies"
         :species="selectedSpecies"
         @close="selectedSpecies = null"
       />
@@ -55,9 +54,8 @@ import FlatMap from './components/FlatMap.vue'
 const { get, continent } = useApi()
 const { slug: currentSlug } = useContinent()
 
-const mapContainer  = ref(null)
-const sightings     = ref([])
-const speciesList   = ref([])
+const sightings       = ref([])
+const speciesList     = ref([])
 const selectedClass   = ref(null)
 const selectedSpecies = ref(null)
 const search          = ref('')
@@ -70,6 +68,10 @@ const continents = [
   { name: 'Asia',          slug: 'asia',         live: false },
   { name: 'Australia',     slug: 'australia',    live: false },
 ]
+
+function onSelectSpecies(sighting) {
+  selectedSpecies.value = sighting
+}
 
 async function loadSightings() {
   try {
@@ -189,10 +191,5 @@ onMounted(() => {
 .map-area {
   flex: 1;
   position: relative;
-}
-
-#map {
-  width: 100%;
-  height: 100%;
 }
 </style>

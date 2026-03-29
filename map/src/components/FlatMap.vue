@@ -2,12 +2,11 @@
   <div class="map-wrap">
     <div ref="mapContainer" class="map"></div>
 
-    <!-- Popup tooltip -->
     <div v-if="popup" class="map-popup" :style="{ left: popup.x + 'px', top: popup.y + 'px' }">
-      <div class="popup-name">{{ popup.common_name || popup.scientific_name }}</div>
+      <div class="popup-name">{{ popup.display_name }}</div>
       <div class="popup-latin" v-if="popup.common_name">{{ popup.scientific_name }}</div>
       <div class="popup-row">
-        <span v-if="popup.iucn_status" class="popup-badge" :style="iucnStyle(popup.iucn_status)">
+        <span v-if="popup.iucn_status && popup.iucn_status !== 'null'" class="popup-badge" :style="iucnStyle(popup.iucn_status)">
           {{ popup.iucn_status }}
         </span>
         <span class="popup-class">{{ popup.class }}</span>
@@ -34,7 +33,6 @@ const { slug } = useContinent()
 const mapContainer = ref(null)
 const popup        = ref(null)
 let map            = null
-let popupData      = {}
 
 const CONTINENT_BOUNDS = {
   northamerica: [-172.0,   5.0,  -48.0,  86.0],
@@ -79,6 +77,7 @@ function buildGeoJSON(sightings) {
       properties: {
         id:              s.id,
         species_id:      s.species_id,
+        display_name:    s.display_name || s.scientific_name,
         common_name:     s.common_name,
         scientific_name: s.scientific_name,
         class:           s.class,
@@ -96,7 +95,6 @@ function buildGeoJSON(sightings) {
 function addLayers() {
   if (!map) return
 
-  // Add or update GeoJSON source
   if (map.getSource('sightings')) {
     map.getSource('sightings').setData(buildGeoJSON(props.sightings))
     return
@@ -105,102 +103,61 @@ function addLayers() {
   map.addSource('sightings', {
     type: 'geojson',
     data: buildGeoJSON(props.sightings),
-    cluster: true,
-    clusterMaxZoom: 8,
-    clusterRadius: 40,
   })
 
-  // Cluster circles
-  map.addLayer({
-    id: 'clusters',
-    type: 'circle',
-    source: 'sightings',
-    filter: ['has', 'point_count'],
-    paint: {
-      'circle-color': [
-        'step', ['get', 'point_count'],
-        '#b05828', 10,
-        '#8c4420', 50,
-        '#6a3018'
-      ],
-      'circle-radius': [
-        'step', ['get', 'point_count'],
-        14, 10,
-        18, 50,
-        22
-      ],
-      'circle-opacity': 0.85,
-      'circle-stroke-width': 1.5,
-      'circle-stroke-color': '#fff',
-      'circle-stroke-opacity': 0.4,
-    }
-  })
+  // Class colour expression — used in multiple layers
+  const classColor = [
+    'match', ['get', 'class'],
+    'Mammalia',  '#b05828',
+    'Aves',      '#4880a8',
+    'Reptilia',  '#6a9848',
+    'Amphibia',  '#8858b0',
+    'Insecta',   '#888780',
+    '#a09080'
+  ]
 
-  // Cluster count labels
-  map.addLayer({
-    id: 'cluster-count',
-    type: 'symbol',
-    source: 'sightings',
-    filter: ['has', 'point_count'],
-    layout: {
-      'text-field': '{point_count_abbreviated}',
-      'text-font': ['Open Sans Bold'],
-      'text-size': 11,
-    },
-    paint: {
-      'text-color': '#ffffff',
-    }
-  })
-
-  // Individual points — colour by class
+  // Base points
   map.addLayer({
     id: 'sightings-points',
     type: 'circle',
     source: 'sightings',
-    filter: ['!', ['has', 'point_count']],
     paint: {
       'circle-radius': [
         'interpolate', ['linear'], ['zoom'],
-        3, 4,
-        8, 7,
-        12, 10
+        2, 3,
+        6, 5,
+        10, 7,
+        14, 10
       ],
-      'circle-color': [
-        'match', ['get', 'class'],
-        'Mammalia',  '#b05828',
-        'Aves',      '#4880a8',
-        'Reptilia',  '#6a9848',
-        'Amphibia',  '#8858b0',
-        'Insecta',   '#888780',
-        '#a09080'
+      'circle-color': classColor,
+      'circle-opacity': [
+        'interpolate', ['linear'], ['zoom'],
+        2, 0.6,
+        8, 0.85
       ],
-      'circle-opacity': 0.85,
-      'circle-stroke-width': 1,
+      'circle-stroke-width': [
+        'interpolate', ['linear'], ['zoom'],
+        2, 0,
+        6, 1
+      ],
       'circle-stroke-color': '#ffffff',
       'circle-stroke-opacity': 0.5,
     }
   })
 
-  // Hover state — enlarge on hover
+  // Hover highlight layer
   map.addLayer({
-    id: 'sightings-points-hover',
+    id: 'sightings-hover',
     type: 'circle',
     source: 'sightings',
     filter: ['==', 'id', ''],
     paint: {
-      'circle-radius': 10,
-      'circle-color': [
-        'match', ['get', 'class'],
-        'Mammalia',  '#b05828',
-        'Aves',      '#4880a8',
-        'Reptilia',  '#6a9848',
-        'Amphibia',  '#8858b0',
-        'Insecta',   '#888780',
-        '#a09080'
-      ],
+      'circle-radius': 12,
+      'circle-color': classColor,
       'circle-opacity': 1,
-      'circle-stroke-width': 2,
+      'circle-stroke-width': 2.5,
       'circle-stroke-color': '#ffffff',
+      'circle-stroke-opacity': 0.9,
     }
   })
 }
@@ -208,47 +165,28 @@ function addLayers() {
 function setupEvents() {
   if (!map) return
 
-  // Hover
   map.on('mousemove', 'sightings-points', (e) => {
     map.getCanvas().style.cursor = 'pointer'
-    const props = e.features[0].properties
-    map.setFilter('sightings-points-hover', ['==', 'id', props.id])
-    const rect = mapContainer.value.getBoundingClientRect()
+    const p = e.features[0].properties
+    map.setFilter('sightings-hover', ['==', 'id', p.id])
     popup.value = {
-      x: e.point.x + 12,
-      y: e.point.y - 10,
-      ...props
+      x: e.point.x + 14,
+      y: e.point.y - 12,
+      ...p
     }
-    popupData = props
   })
 
   map.on('mouseleave', 'sightings-points', () => {
     map.getCanvas().style.cursor = ''
-    map.setFilter('sightings-points-hover', ['==', 'id', ''])
+    map.setFilter('sightings-hover', ['==', 'id', ''])
     popup.value = null
   })
 
-  // Click individual point
   map.on('click', 'sightings-points', (e) => {
-    const props = e.features[0].properties
-    emit('select-species', props)
+    emit('select-species', e.features[0].properties)
     popup.value = null
   })
 
-  // Click cluster — zoom in
-  map.on('click', 'clusters', (e) => {
-    const features = map.queryRenderedFeatures(e.point, { layers: ['clusters'] })
-    const clusterId = features[0].properties.cluster_id
-    map.getSource('sightings').getClusterExpansionZoom(clusterId, (err, zoom) => {
-      if (err) return
-      map.easeTo({ center: features[0].geometry.coordinates, zoom })
-    })
-  })
-
-  map.on('mouseenter', 'clusters', () => { map.getCanvas().style.cursor = 'pointer' })
-  map.on('mouseleave', 'clusters', () => { map.getCanvas().style.cursor = '' })
-
-  // Close popup on map click
   map.on('click', () => { popup.value = null })
 }
 
@@ -284,28 +222,19 @@ onUnmounted(() => {
 })
 
 watch(() => props.sightings, () => {
-  if (map && map.isStyleLoaded()) {
-    if (map.getSource('sightings')) {
-      map.getSource('sightings').setData(buildGeoJSON(props.sightings))
-    } else {
-      addLayers()
-      setupEvents()
-    }
+  if (!map || !map.isStyleLoaded()) return
+  if (map.getSource('sightings')) {
+    map.getSource('sightings').setData(buildGeoJSON(props.sightings))
+  } else {
+    addLayers()
+    setupEvents()
   }
 }, { deep: true })
 </script>
 
 <style scoped>
-.map-wrap {
-  width: 100%;
-  height: 100%;
-  position: relative;
-}
-
-.map {
-  width: 100%;
-  height: 100%;
-}
+.map-wrap { width: 100%; height: 100%; position: relative; }
+.map { width: 100%; height: 100%; }
 
 .map-popup {
   position: absolute;
@@ -349,13 +278,6 @@ watch(() => props.sightings, () => {
   border-radius: 3px;
 }
 
-.popup-class {
-  font-size: 10px;
-  color: #a09080;
-}
-
-.popup-hint {
-  font-size: 9px;
-  color: #b0a090;
-}
+.popup-class { font-size: 10px; color: #a09080; }
+.popup-hint  { font-size: 9px; color: #b0a090; }
 </style>

@@ -6,7 +6,7 @@
         <button class="xbtn" @click="$emit('close')">✕</button>
       </div>
       <div class="dbody">
-        <div class="dname">{{ species.common_name || species.scientific_name }}</div>
+        <div class="dname">{{ species.display_name || species.common_name || species.scientific_name }}</div>
         <div class="dlatin" v-if="species.common_name">{{ species.scientific_name }}</div>
         <div class="dtags">
           <span v-if="species.iucn_status" class="tag" :style="iucnStyle(species.iucn_status)">

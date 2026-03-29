@@ -50,21 +50,15 @@ def fetch_page(last_sync, offset):
         "basisOfRecord":      "HUMAN_OBSERVATION",
         "hasCoordinate":      "true",
         "hasGeospatialIssue": "false",
+        "kingdom":            "Animalia",
+        "class":              "Mammalia,Aves,Reptilia,Amphibia",
         "lastInterpreted":    f"{last_sync},{today}",
         "limit":              BATCH_SIZE,
         "offset":             offset,
     }
-    for attempt in range(3):
-        try:
-            resp = requests.get(GBIF_API, params=params, timeout=120)
-            resp.raise_for_status()
-            return resp.json()
-        except Exception as e:
-            if attempt == 2:
-                raise
-            print(f"      Retry {attempt + 1}/3 after error: {e}")
-            import time
-            time.sleep(10)
+    resp = requests.get(GBIF_API, params=params, timeout=30)
+    resp.raise_for_status()
+    return resp.json()
 
 
 def upsert_species(conn, record):

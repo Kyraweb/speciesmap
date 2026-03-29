@@ -83,22 +83,25 @@ function getColor(cls) {
 }
 
 function createMarkerEl(sighting) {
-  const el = document.createElement('div')
-  el.className = 'species-marker'
   const color = getColor(sighting.class)
-  el.style.cssText = `
-    width: 12px;
-    height: 12px;
+  // Outer wrapper — MapLibre positions this, never apply transform to it
+  const wrapper = document.createElement('div')
+  wrapper.style.cssText = `width: 14px; height: 14px; position: relative; cursor: pointer;`
+  // Inner dot — safe to scale on hover
+  const dot = document.createElement('div')
+  dot.style.cssText = `
+    position: absolute;
+    inset: 1px;
     border-radius: 50%;
     background: ${color};
     border: 1.5px solid ${color}cc;
-    cursor: pointer;
     transition: transform 0.15s;
     box-shadow: 0 0 0 3px ${color}22, 0 0 8px ${color}44;
   `
-  el.addEventListener('mouseenter', () => { el.style.transform = 'scale(1.4)' })
-  el.addEventListener('mouseleave', () => { el.style.transform = 'scale(1)' })
-  return el
+  wrapper.appendChild(dot)
+  wrapper.addEventListener('mouseenter', () => { dot.style.transform = 'scale(1.4)' })
+  wrapper.addEventListener('mouseleave', () => { dot.style.transform = 'scale(1)' })
+  return wrapper
 }
 
 function clearMarkers() {
@@ -115,7 +118,7 @@ function plotSightings() {
 
     const el = createMarkerEl(s)
 
-    const m = new maptilersdk.Marker({ element: el })
+    const m = new maptilersdk.Marker({ element: el, anchor: 'center' })
       .setLngLat([s.lng, s.lat])
       .addTo(map)
 

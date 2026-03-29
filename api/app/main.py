@@ -13,7 +13,12 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "https://speciesmap.org",
-        "https://*.speciesmap.org",
+        "https://northamerica.speciesmap.org",
+        "https://southamerica.speciesmap.org",
+        "https://europe.speciesmap.org",
+        "https://africa.speciesmap.org",
+        "https://asia.speciesmap.org",
+        "https://australia.speciesmap.org",
         "http://localhost:5173",
     ],
     allow_credentials=True,

@@ -44,7 +44,8 @@ def get_last_sync(conn):
     return (datetime.utcnow() - timedelta(days=30)).strftime("%Y-%m-%d")
 
 
-def fetch_page(last_sync, offset):
+def fetch_page(last_sync, offset, class_name):
+    """Fetch one page for a specific class — GBIF only accepts one class per request."""
     today = datetime.utcnow().strftime("%Y-%m-%d")
     params = {
         "continent":          CONTINENT,
@@ -52,7 +53,7 @@ def fetch_page(last_sync, offset):
         "hasCoordinate":      "true",
         "hasGeospatialIssue": "false",
         "kingdom":            "Animalia",
-        "class":              "Mammalia,Aves,Reptilia,Amphibia",
+        "class":              class_name,
         "lastInterpreted":    f"{last_sync},{today}",
         "limit":              BATCH_SIZE,
         "offset":             offset,

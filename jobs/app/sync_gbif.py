@@ -54,9 +54,17 @@ def fetch_page(last_sync, offset):
         "limit":              BATCH_SIZE,
         "offset":             offset,
     }
-    resp = requests.get(GBIF_API, params=params, timeout=30)
-    resp.raise_for_status()
-    return resp.json()
+    for attempt in range(3):
+        try:
+            resp = requests.get(GBIF_API, params=params, timeout=120)
+            resp.raise_for_status()
+            return resp.json()
+        except Exception as e:
+            if attempt == 2:
+                raise
+            print(f"      Retry {attempt + 1}/3 after error: {e}")
+            import time
+            time.sleep(10)
 
 
 def upsert_species(conn, record):

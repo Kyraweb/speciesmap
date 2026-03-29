@@ -16,10 +16,11 @@ from dotenv import load_dotenv
 load_dotenv()
 
 DATABASE_URL = os.getenv("DATABASE_URL")
-GBIF_API     = "https://api.gbif.org/v1/occurrence/search"
-SOURCE_ID    = 1  # GBIF row in data_sources table
-CONTINENT    = "NORTH_AMERICA"
-BATCH_SIZE   = 300
+GBIF_API      = "https://api.gbif.org/v1/occurrence/search"
+SOURCE_ID     = 1  # GBIF row in data_sources table
+CONTINENT     = "NORTH_AMERICA"
+BATCH_SIZE    = 300
+TARGET_CLASSES = ["Mammalia", "Aves", "Reptilia", "Amphibia"]
 
 
 def get_connection():
@@ -216,44 +217,54 @@ def main():
     offset = 0
 
     try:
-        while True:
-            print(f"\n  Fetching offset {offset}...")
-            data = fetch_page(last_sync, offset)
-            records = data.get("results", [])
+        for class_name in TARGET_CLASSES:
+            print(f"\n  --- Syncing class: {class_name} ---")
+            offset = 0
 
-            if not records:
-                print("  No more records.")
-                break
+            while True:
+                print(f"  Fetching {class_name} offset {offset}...")
+                data = fetch_page(last_sync, offset, class_name)
+                records = data.get("results", [])
 
-            print(f"  Got {len(records)} records from GBIF")
+                if not records:
+                    print(f"  No more {class_name} records.")
+                    break
 
-            for record in records:
-                total_fetched += 1
+                print(f"  Got {len(records)} records from GBIF")
 
-                valid, reason = validate_record(record)
-                if not valid:
-                    reject_record(conn, record, reason)
-                    total_rejected += 1
-                    continue
+                for record in records:
+                    # Extra safety — skip if class doesn't match target
+                    if record.get("class") not in TARGET_CLASSES:
+                        reject_record(conn, record, "wrong_class")
+                        total_rejected += 1
+                        continue
 
-                species_id = upsert_species(conn, record)
-                if not species_id:
-                    reject_record(conn, record, "species_insert_failed")
-                    total_rejected += 1
-                    continue
+                    total_fetched += 1
 
-                inserted = insert_sighting(conn, record, species_id)
-                if inserted:
-                    total_inserted += 1
-                else:
-                    total_skipped += 1
+                    valid, reason = validate_record(record)
+                    if not valid:
+                        reject_record(conn, record, reason)
+                        total_rejected += 1
+                        continue
 
-            conn.commit()
+                    species_id = upsert_species(conn, record)
+                    if not species_id:
+                        reject_record(conn, record, "species_insert_failed")
+                        total_rejected += 1
+                        continue
 
-            if data.get("endOfRecords", True):
-                break
+                    inserted = insert_sighting(conn, record, species_id)
+                    if inserted:
+                        total_inserted += 1
+                    else:
+                        total_skipped += 1
 
-            offset += BATCH_SIZE
+                conn.commit()
+
+                if data.get("endOfRecords", True):
+                    break
+
+                offset += BATCH_SIZE
 
         update_last_synced(conn)
         log_run(conn, run_id, total_fetched, total_inserted, total_skipped, total_rejected, "success")

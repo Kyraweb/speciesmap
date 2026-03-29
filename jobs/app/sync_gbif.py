@@ -1,12 +1,12 @@
 """
-speciesmap.org — GBIF sync worker
+speciesmap.org — GBIF sync worker (multi-class)
 Runs as a Coolify scheduled task — weekly Sunday 3am UTC
-Fetches new sightings from GBIF API for North America
-and inserts into the sightings table.
+Fetches sightings from GBIF API for North America
+one class at a time: Mammalia, Aves, Reptilia, Amphibia
 """
 
 import os
-import sys
+import time
 import requests
 import psycopg2
 import psycopg2.extras
@@ -15,11 +15,11 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-DATABASE_URL = os.getenv("DATABASE_URL")
-GBIF_API      = "https://api.gbif.org/v1/occurrence/search"
-SOURCE_ID     = 1  # GBIF row in data_sources table
-CONTINENT     = "NORTH_AMERICA"
-BATCH_SIZE    = 300
+DATABASE_URL   = os.getenv("DATABASE_URL")
+GBIF_API       = "https://api.gbif.org/v1/occurrence/search"
+SOURCE_ID      = 1
+CONTINENT      = "NORTH_AMERICA"
+BATCH_SIZE     = 300
 TARGET_CLASSES = ["Mammalia", "Aves", "Reptilia", "Amphibia"]
 
 
@@ -40,12 +40,11 @@ def get_last_sync(conn):
     cur.close()
     if row and row["last_synced_at"]:
         return row["last_synced_at"].strftime("%Y-%m-%d")
-    # Default — go back 30 days if never synced
     return (datetime.utcnow() - timedelta(days=30)).strftime("%Y-%m-%d")
 
 
 def fetch_page(last_sync, offset, class_name):
-    """Fetch one page for a specific class — GBIF only accepts one class per request."""
+    """Fetch one page for a specific class."""
     today = datetime.utcnow().strftime("%Y-%m-%d")
     params = {
         "continent":          CONTINENT,
@@ -58,16 +57,22 @@ def fetch_page(last_sync, offset, class_name):
         "limit":              BATCH_SIZE,
         "offset":             offset,
     }
-    resp = requests.get(GBIF_API, params=params, timeout=30)
+    for attempt in range(3):
+        try:
+            resp = requests.get(GBIF_API, params=params, timeout=120)
             if resp.status_code == 400:
-                print(f"      GBIF pagination limit reached at offset {offset} — treating as end of records")
+                print(f"      GBIF pagination limit reached at offset {offset} — end of records")
                 return {"results": [], "endOfRecords": True}
-    resp.raise_for_status()
-    return resp.json()
+            resp.raise_for_status()
+            return resp.json()
+        except Exception as e:
+            if attempt == 2:
+                raise
+            print(f"      Retry {attempt + 1}/3 after error: {e}")
+            time.sleep(10)
 
 
 def upsert_species(conn, record):
-    """Insert species if not exists, return species id."""
     cur = conn.cursor()
     cur.execute("""
         INSERT INTO species (scientific_name, common_name, class, order_name, family, genus)
@@ -94,17 +99,14 @@ def upsert_species(conn, record):
 
 
 def validate_record(record):
-    """Basic validation — returns (valid, reason)."""
     lat = record.get("decimalLatitude")
     lng = record.get("decimalLongitude")
-
     if lat is None or lng is None:
         return False, "missing_coords"
     if lat == 0.0 and lng == 0.0:
         return False, "invalid_coords_zero"
     if not (-90 <= lat <= 90) or not (-180 <= lng <= 180):
         return False, "invalid_coords_bounds"
-
     event_date = record.get("eventDate", "")
     if event_date:
         try:
@@ -115,37 +117,32 @@ def validate_record(record):
                 return False, "date_too_old"
         except ValueError:
             pass
-
     return True, None
 
 
 def insert_sighting(conn, record, species_id):
     cur = conn.cursor()
     external_id = str(record.get("key", ""))
-
     cur.execute("""
         INSERT INTO sightings (
             species_id, source_id, location, observed_at,
             continent, country, individual_count, external_id
         )
-        SELECT
-            %s, %s,
+        SELECT %s, %s,
             ST_SetSRID(ST_MakePoint(%s, %s), 4326),
             %s, %s, %s, %s, %s
         WHERE NOT EXISTS (
             SELECT 1 FROM sightings WHERE external_id = %s
         )
     """, [
-        species_id,
-        SOURCE_ID,
+        species_id, SOURCE_ID,
         record.get("decimalLongitude"),
         record.get("decimalLatitude"),
         record.get("eventDate"),
         "North America",
         record.get("country"),
         record.get("individualCount", 1),
-        external_id,
-        external_id,
+        external_id, external_id,
     ])
     inserted = cur.rowcount
     cur.close()
@@ -193,15 +190,68 @@ def update_last_synced(conn):
     cur.close()
 
 
+def sync_class(conn, class_name, last_sync, run_id):
+    print(f"\n  --- Syncing class: {class_name} ---")
+    total_fetched  = 0
+    total_inserted = 0
+    total_skipped  = 0
+    total_rejected = 0
+    offset = 0
+
+    while True:
+        print(f"  Fetching {class_name} offset {offset}...")
+        data = fetch_page(last_sync, offset, class_name)
+        records = data.get("results", [])
+
+        if not records:
+            print(f"  No more {class_name} records.")
+            break
+
+        print(f"  Got {len(records)} records from GBIF")
+
+        for record in records:
+            if record.get("class") not in TARGET_CLASSES:
+                continue
+
+            total_fetched += 1
+
+            valid, reason = validate_record(record)
+            if not valid:
+                reject_record(conn, record, reason)
+                total_rejected += 1
+                continue
+
+            species_id = upsert_species(conn, record)
+            if not species_id:
+                reject_record(conn, record, "species_insert_failed")
+                total_rejected += 1
+                continue
+
+            inserted = insert_sighting(conn, record, species_id)
+            if inserted:
+                total_inserted += 1
+            else:
+                total_skipped += 1
+
+        conn.commit()
+
+        if data.get("endOfRecords", True):
+            break
+
+        offset += BATCH_SIZE
+
+    print(f"  {class_name} done — fetched: {total_fetched}, inserted: {total_inserted}, skipped: {total_skipped}, rejected: {total_rejected}")
+    return total_fetched, total_inserted, total_skipped, total_rejected
+
+
 def main():
     print("=" * 50)
-    print("  speciesmap.org — GBIF sync")
+    print("  speciesmap.org — GBIF sync (all classes)")
     print(f"  Started: {datetime.utcnow().isoformat()}")
     print("=" * 50)
 
     conn = get_connection()
 
-    # Create ETL run log entry
     cur = conn.cursor()
     cur.execute(
         "INSERT INTO etl_runs (source_id, status) VALUES (%s, 'running') RETURNING id",
@@ -218,55 +268,14 @@ def main():
     total_inserted = 0
     total_skipped  = 0
     total_rejected = 0
-    offset = 0
 
     try:
         for class_name in TARGET_CLASSES:
-            print(f"\n  --- Syncing class: {class_name} ---")
-            offset = 0
-
-            while True:
-                print(f"  Fetching {class_name} offset {offset}...")
-                data = fetch_page(last_sync, offset, class_name)
-                records = data.get("results", [])
-
-                if not records:
-                    print(f"  No more {class_name} records.")
-                    break
-
-                print(f"  Got {len(records)} records from GBIF")
-
-                for record in records:
-                    # Skip silently if class doesn't match — GBIF taxonomy mismatches are common
-                    if record.get("class") not in TARGET_CLASSES:
-                        continue
-
-                    total_fetched += 1
-
-                    valid, reason = validate_record(record)
-                    if not valid:
-                        reject_record(conn, record, reason)
-                        total_rejected += 1
-                        continue
-
-                    species_id = upsert_species(conn, record)
-                    if not species_id:
-                        reject_record(conn, record, "species_insert_failed")
-                        total_rejected += 1
-                        continue
-
-                    inserted = insert_sighting(conn, record, species_id)
-                    if inserted:
-                        total_inserted += 1
-                    else:
-                        total_skipped += 1
-
-                conn.commit()
-
-                if data.get("endOfRecords", True):
-                    break
-
-                offset += BATCH_SIZE
+            f, i, s, r = sync_class(conn, class_name, last_sync, run_id)
+            total_fetched  += f
+            total_inserted += i
+            total_skipped  += s
+            total_rejected += r
 
         update_last_synced(conn)
         log_run(conn, run_id, total_fetched, total_inserted, total_skipped, total_rejected, "success")
@@ -274,7 +283,10 @@ def main():
 
     except Exception as e:
         print(f"\n  ERROR: {e}")
-        log_run(conn, run_id, total_fetched, total_inserted, total_skipped, total_rejected, "failed", str(e))
+        try:
+            log_run(conn, run_id, total_fetched, total_inserted, total_skipped, total_rejected, "failed", str(e))
+        except Exception:
+            pass
         status = "failed"
 
     finally:

@@ -177,16 +177,31 @@ function addLayers(geojson) {
 }
 
 function setupEvents() {
+  let hoverTimeout = null
+  let currentHex   = null
+
   map.on('mousemove', 'hex-fill', (e) => {
     map.getCanvas().style.cursor = 'pointer'
-    const p = e.features[0].properties
-    // Only update filter and popup — no GeoJSON rebuild
-    map.setFilter('hex-hover', ['==', 'h3_index', p.h3_index])
+    const p      = e.features[0].properties
+    const newHex = p.h3_index
+
+    // Always show popup immediately for responsiveness
     popup.value = { x: e.point.x + 14, y: e.point.y - 10, ...p }
+
+    // Debounce the hover highlight — only fire after cursor pauses 80ms on same hex
+    if (newHex === currentHex) return
+    currentHex = newHex
+
+    clearTimeout(hoverTimeout)
+    hoverTimeout = setTimeout(() => {
+      map.setFilter('hex-hover', ['==', 'h3_index', newHex])
+    }, 80)
   })
 
   map.on('mouseleave', 'hex-fill', () => {
     map.getCanvas().style.cursor = ''
+    clearTimeout(hoverTimeout)
+    currentHex = null
     map.setFilter('hex-hover', ['==', 'h3_index', ''])
     popup.value = null
   })

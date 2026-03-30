@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.routers import species, sightings, routes, alerts
+from app.routers import species, sightings, routes, alerts, hex
 import os
 
 app = FastAPI(
@@ -26,11 +26,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Routers
 app.include_router(species.router,   prefix="/api")
 app.include_router(sightings.router, prefix="/api")
 app.include_router(routes.router,    prefix="/api")
 app.include_router(alerts.router,    prefix="/api")
+app.include_router(hex.router,       prefix="/api")
 
 
 @app.get("/health")

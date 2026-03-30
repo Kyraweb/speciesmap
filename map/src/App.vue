@@ -8,9 +8,27 @@
           :key="c.slug"
           class="ctab"
           :class="{ active: c.slug === currentSlug, soon: !c.live }"
+        >{{ c.name }}</span>
+      </div>
+      <div class="view-toggle">
+        <button
+          class="vtab"
+          :class="{ active: viewMode === 'hex' }"
+          @click="viewMode = 'hex'"
+          title="Biodiversity map"
         >
-          {{ c.name }}
-        </span>
+          <svg width="14" height="14" viewBox="0 0 14 14"><polygon points="7,1 13,4.5 13,9.5 7,13 1,9.5 1,4.5" fill="none" stroke="currentColor" stroke-width="1.2"/></svg>
+          Biodiversity
+        </button>
+        <button
+          class="vtab"
+          :class="{ active: viewMode === 'dots' }"
+          @click="viewMode = 'dots'"
+          title="Species sightings"
+        >
+          <svg width="14" height="14" viewBox="0 0 14 14"><circle cx="7" cy="7" r="4" fill="none" stroke="currentColor" stroke-width="1.2"/><circle cx="3" cy="3" r="2" fill="currentColor" opacity="0.5"/><circle cx="11" cy="10" r="2" fill="currentColor" opacity="0.5"/></svg>
+          Sightings
+        </button>
       </div>
       <div class="nav-right">
         <input class="search" type="text" placeholder="Search species..." v-model="search" />
@@ -21,21 +39,40 @@
       <aside class="sidebar">
         <Sidebar
           :selected-class="selectedClass"
-          :sighting-count="sightings.length"
-          :species-count="speciesList.length"
+          :sighting-count="viewMode === 'hex' ? hexStats?.total_sightings : sightings.length"
+          :species-count="viewMode === 'hex' ? hexStats?.total_species_records : speciesList.length"
+          :view-mode="viewMode"
           @filter-class="selectedClass = $event"
         />
       </aside>
 
       <main class="map-area">
+        <!-- Hex biodiversity map -->
+        <HexMap
+          v-if="viewMode === 'hex'"
+          :selected-class="selectedClass"
+          @select-hex="onSelectHex"
+        />
+
+        <!-- Species sightings dots map -->
         <FlatMap
+          v-else
           :sightings="sightings"
           :selected-class="selectedClass"
           @select-species="onSelectSpecies"
         />
       </main>
 
+      <!-- Hex detail panel -->
+      <HexDetail
+        v-if="viewMode === 'hex'"
+        :hex-index="selectedHex"
+        @close="selectedHex = null"
+      />
+
+      <!-- Species detail panel -->
       <DetailPanel
+        v-else
         :species="selectedSpecies"
         @close="selectedSpecies = null"
       />
@@ -47,16 +84,21 @@
 import { ref, onMounted, watch } from 'vue'
 import { useApi } from './composables/useApi'
 import { useContinent } from './composables/useContinent'
-import Sidebar from './components/Sidebar.vue'
+import Sidebar     from './components/Sidebar.vue'
 import DetailPanel from './components/DetailPanel.vue'
-import FlatMap from './components/FlatMap.vue'
+import FlatMap     from './components/FlatMap.vue'
+import HexMap      from './components/HexMap.vue'
+import HexDetail   from './components/HexDetail.vue'
 
 const { get, continent } = useApi()
 const { slug: currentSlug } = useContinent()
 
-const sightings       = ref([])
-const speciesList     = ref([])
+const viewMode      = ref('hex')  // 'hex' | 'dots'
+const sightings     = ref([])
+const speciesList   = ref([])
+const hexStats      = ref(null)
 const selectedClass   = ref(null)
+const selectedHex     = ref(null)
 const selectedSpecies = ref(null)
 const search          = ref('')
 
@@ -69,8 +111,14 @@ const continents = [
   { name: 'Australia',     slug: 'australia',    live: false },
 ]
 
+function onSelectHex(h3Index) {
+  selectedHex.value     = h3Index
+  selectedSpecies.value = null
+}
+
 function onSelectSpecies(sighting) {
   selectedSpecies.value = sighting
+  selectedHex.value     = null
 }
 
 async function loadSightings() {
@@ -94,14 +142,30 @@ async function loadSpecies() {
   }
 }
 
+async function loadHexStats() {
+  try {
+    hexStats.value = await get('/api/hex/stats/overview')
+  } catch (e) {
+    console.error('Failed to load hex stats:', e)
+  }
+}
+
 watch(selectedClass, () => {
-  loadSightings()
-  loadSpecies()
+  if (viewMode.value === 'dots') {
+    loadSightings()
+    loadSpecies()
+  }
+})
+
+watch(viewMode, (mode) => {
+  if (mode === 'dots' && sightings.value.length === 0) {
+    loadSightings()
+    loadSpecies()
+  }
 })
 
 onMounted(() => {
-  loadSightings()
-  loadSpecies()
+  loadHexStats()
 })
 </script>
 
@@ -116,8 +180,8 @@ onMounted(() => {
 .topnav {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 0 16px;
+  gap: 10px;
+  padding: 0 14px;
   height: 48px;
   background: var(--color-bg-sidebar);
   border-bottom: 0.5px solid var(--color-border);
@@ -129,11 +193,7 @@ onMounted(() => {
   font-size: 15px;
   color: var(--color-text-primary);
 }
-
-.logo b {
-  color: var(--color-mammal);
-  font-weight: normal;
-}
+.logo b { color: var(--color-mammal); font-weight: normal; }
 
 .continent-tabs {
   display: flex;
@@ -144,27 +204,44 @@ onMounted(() => {
 }
 
 .ctab {
-  padding: 4px 10px;
+  padding: 4px 9px;
   font-size: 11px;
   border-radius: 3px;
   cursor: pointer;
   color: var(--color-text-muted);
 }
+.ctab.active { background: var(--color-bg-panel); color: var(--color-text-primary); }
+.ctab.soon   { opacity: 0.45; cursor: default; }
 
-.ctab.active {
+.view-toggle {
+  display: flex;
+  gap: 2px;
+  background: rgba(0,0,0,0.06);
+  border-radius: 5px;
+  padding: 3px;
+  margin-left: 4px;
+}
+
+.vtab {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  font-size: 11px;
+  border-radius: 3px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: var(--color-text-muted);
+  font-family: var(--font-sans);
+  transition: background 0.15s, color 0.15s;
+}
+.vtab.active {
   background: var(--color-bg-panel);
   color: var(--color-text-primary);
 }
 
-.ctab.soon {
-  opacity: 0.45;
-  cursor: default;
-}
-
-.nav-right {
-  margin-left: auto;
-}
-
+.nav-right { margin-left: auto; }
 .search {
   background: rgba(255,255,255,0.6);
   border: 0.5px solid var(--color-border);
@@ -172,7 +249,7 @@ onMounted(() => {
   padding: 5px 10px;
   font-size: 11px;
   color: var(--color-text-secondary);
-  width: 180px;
+  width: 170px;
   outline: none;
 }
 
@@ -183,13 +260,6 @@ onMounted(() => {
   position: relative;
 }
 
-.sidebar {
-  width: 200px;
-  flex-shrink: 0;
-}
-
-.map-area {
-  flex: 1;
-  position: relative;
-}
+.sidebar  { width: 200px; flex-shrink: 0; }
+.map-area { flex: 1; position: relative; }
 </style>

@@ -2,43 +2,42 @@
   <div class="map-wrap">
     <div ref="mapContainer" class="map"></div>
 
-    <!-- Hex popup -->
+    <div v-if="loading" class="map-loading">
+      <div class="loading-text">Computing biodiversity map...</div>
+    </div>
+
     <div v-if="popup" class="hex-popup" :style="{ left: popup.x + 'px', top: popup.y + 'px' }">
       <div class="popup-score">
         <span class="score-num" :style="{ color: scoreColor(popup.biodiversity_score) }">
-          {{ Math.round(popup.biodiversity_score) }}
+          {{ Math.round(popup.biodiversity_score || 0) }}
         </span>
         <span class="score-label">biodiversity score</span>
       </div>
       <div class="popup-stats">
         <span>{{ popup.species_count }} species</span>
         <span>·</span>
-        <span>{{ popup.sighting_count?.toLocaleString() }} sightings</span>
+        <span>{{ Number(popup.sighting_count).toLocaleString() }} sightings</span>
       </div>
       <div class="popup-classes">
-        <span v-if="popup.mammal_count" class="cls-pill mammal">{{ popup.mammal_count }} mammals</span>
-        <span v-if="popup.bird_count" class="cls-pill bird">{{ popup.bird_count }} birds</span>
-        <span v-if="popup.reptile_count" class="cls-pill reptile">{{ popup.reptile_count }} reptiles</span>
-        <span v-if="popup.amphibian_count" class="cls-pill amphib">{{ popup.amphibian_count }} amphib.</span>
+        <span v-if="popup.mammal_count > 0" class="cls-pill mammal">{{ popup.mammal_count }} mammals</span>
+        <span v-if="popup.bird_count > 0" class="cls-pill bird">{{ popup.bird_count }} birds</span>
+        <span v-if="popup.reptile_count > 0" class="cls-pill reptile">{{ popup.reptile_count }} reptiles</span>
+        <span v-if="popup.amphibian_count > 0" class="cls-pill amphib">{{ popup.amphibian_count }} amphib.</span>
       </div>
       <div class="popup-hint">Click to explore →</div>
     </div>
 
-    <!-- Legend -->
     <div class="legend">
       <div class="legend-title">Biodiversity score</div>
       <div class="legend-scale">
         <div class="legend-bar"></div>
-        <div class="legend-labels">
-          <span>Low</span>
-          <span>High</span>
-        </div>
+        <div class="legend-labels"><span>Low</span><span>High</span></div>
       </div>
       <div class="legend-classes">
-        <span class="cls-dot mammal"></span> Mammals
-        <span class="cls-dot bird"></span> Birds
-        <span class="cls-dot reptile"></span> Reptiles
-        <span class="cls-dot amphib"></span> Amphibians
+        <div><span class="cls-dot mammal"></span> Mammals</div>
+        <div><span class="cls-dot bird"></span> Birds</div>
+        <div><span class="cls-dot reptile"></span> Reptiles</div>
+        <div><span class="cls-dot amphib"></span> Amphibians</div>
       </div>
     </div>
   </div>
@@ -48,6 +47,7 @@
 import { ref, onMounted, onUnmounted, watch } from 'vue'
 import * as maptilersdk from '@maptiler/sdk'
 import '@maptiler/sdk/dist/maptiler-sdk.css'
+import { cellToBoundary } from 'h3-js'
 import { useContinent } from '../composables/useContinent'
 import { useApi } from '../composables/useApi'
 
@@ -59,10 +59,13 @@ const emit = defineEmits(['select-hex'])
 
 const { slug } = useContinent()
 const { get }  = useApi()
+
 const mapContainer = ref(null)
 const popup        = ref(null)
-let map            = null
-let hexData        = []
+const loading      = ref(true)
+
+let map        = null
+let geojsonCache = null  // cached once, never recomputed
 
 const CONTINENT_BOUNDS = {
   northamerica: [-172.0, 5.0, -48.0, 86.0],
@@ -76,151 +79,110 @@ const CONTINENT_BOUNDS = {
 const CONTINENT_VIEW = {
   northamerica: { center: [-98.0, 45.0], zoom: 3 },
   southamerica: { center: [-58.0, -20.0], zoom: 3 },
-  europe:       { center: [10.0, 54.0],  zoom: 3.5 },
-  africa:       { center: [18.0, 2.0],   zoom: 3 },
-  asia:         { center: [95.0, 40.0],  zoom: 2.5 },
+  europe:       { center: [10.0, 54.0], zoom: 3.5 },
+  africa:       { center: [18.0, 2.0], zoom: 3 },
+  asia:         { center: [95.0, 40.0], zoom: 2.5 },
   australia:    { center: [134.0, -27.0], zoom: 3.5 },
 }
 
-// Biodiversity score → colour (parchment → sage → deep forest)
 function scoreToColor(score, maxScore) {
-  const t = Math.min(score / maxScore, 1)
-  if (t < 0.2) return '#e8e4d8'
-  if (t < 0.4) return '#d4d8c0'
-  if (t < 0.6) return '#a8bc88'
-  if (t < 0.75) return '#7a9e58'
-  if (t < 0.9) return '#567a38'
-  return '#3a5820'
+  const t = Math.min(score / Math.max(maxScore, 1), 1)
+  if (t < 0.15) return '#e8e4d8'
+  if (t < 0.30) return '#d4d8c0'
+  if (t < 0.45) return '#b8c898'
+  if (t < 0.60) return '#90b068'
+  if (t < 0.75) return '#6a9848'
+  if (t < 0.88) return '#4e7830'
+  return '#335820'
 }
 
 function scoreColor(score) {
-  if (score < 15) return '#a09080'
+  if (!score || score < 15) return '#a09080'
   if (score < 25) return '#6a9848'
-  if (score < 40) return '#567a38'
-  return '#3a5820'
+  if (score < 40) return '#4e7830'
+  return '#335820'
 }
 
-// Convert h3 index to GeoJSON polygon using h3-js
-async function buildGeoJSON(data) {
-  const { cellToBoundary } = await import('https://esm.sh/h3-js@4')
-  const maxScore = Math.max(...data.map(d => d.biodiversity_score || d.sighting_count || 1))
-
+// Build GeoJSON ONCE — called on mount only
+function buildGeoJSON(data) {
+  const maxScore = Math.max(...data.map(d => d.biodiversity_score || 0), 1)
   const features = []
+
   for (const hex of data) {
     try {
-      const boundary = cellToBoundary(hex.h3_index, true) // true = GeoJSON order [lng, lat]
-      const score    = hex.biodiversity_score || 0
-      const color    = scoreToColor(score, maxScore)
+      // cellToBoundary returns [lat, lng] pairs — need to flip to [lng, lat] for GeoJSON
+      const boundary = cellToBoundary(hex.h3_index)
+      const coords   = boundary.map(([lat, lng]) => [lng, lat])
+      coords.push(coords[0]) // close the polygon
 
       features.push({
         type: 'Feature',
-        geometry: {
-          type: 'Polygon',
-          coordinates: [boundary]
-        },
+        geometry: { type: 'Polygon', coordinates: [coords] },
         properties: {
-          h3_index:          hex.h3_index,
-          biodiversity_score: score,
-          species_count:     hex.species_count || 0,
-          sighting_count:    hex.sighting_count || 0,
-          threatened_count:  hex.threatened_count || 0,
-          mammal_count:      hex.mammal_count || 0,
-          bird_count:        hex.bird_count || 0,
-          reptile_count:     hex.reptile_count || 0,
-          amphibian_count:   hex.amphibian_count || 0,
-          color,
+          h3_index:           hex.h3_index,
+          biodiversity_score: hex.biodiversity_score || 0,
+          species_count:      hex.species_count || 0,
+          sighting_count:     hex.sighting_count || 0,
+          threatened_count:   hex.threatened_count || 0,
+          mammal_count:       hex.mammal_count || 0,
+          bird_count:         hex.bird_count || 0,
+          reptile_count:      hex.reptile_count || 0,
+          amphibian_count:    hex.amphibian_count || 0,
+          color:              scoreToColor(hex.biodiversity_score || 0, maxScore),
         }
       })
     } catch (e) {
-      // skip invalid hex
+      // skip invalid hex index
     }
   }
 
   return { type: 'FeatureCollection', features }
 }
 
-async function loadHexData() {
-  try {
-    const params = {}
-    if (props.selectedClass) params.class = props.selectedClass
-    hexData = await get('/api/hex/biodiversity', params)
-    return hexData
-  } catch (e) {
-    console.error('Failed to load hex data:', e)
-    return []
-  }
-}
-
-async function renderHexes() {
-  if (!map || !map.isStyleLoaded()) return
-
-  const data    = await loadHexData()
-  const geojson = await buildGeoJSON(data)
-
-  if (map.getSource('hexes')) {
-    map.getSource('hexes').setData(geojson)
-    return
-  }
-
+function addLayers(geojson) {
   map.addSource('hexes', { type: 'geojson', data: geojson })
 
-  // Fill layer
   map.addLayer({
     id: 'hex-fill',
     type: 'fill',
     source: 'hexes',
     paint: {
       'fill-color': ['get', 'color'],
-      'fill-opacity': [
-        'interpolate', ['linear'], ['zoom'],
-        2, 0.7,
-        8, 0.85
-      ]
+      'fill-opacity': ['interpolate', ['linear'], ['zoom'], 2, 0.75, 8, 0.88]
     }
   })
 
-  // Border layer
   map.addLayer({
     id: 'hex-border',
     type: 'line',
     source: 'hexes',
     paint: {
       'line-color': '#f0ece0',
-      'line-width': [
-        'interpolate', ['linear'], ['zoom'],
-        2, 0.3,
-        6, 0.8,
-        10, 1.2
-      ],
-      'line-opacity': 0.5
+      'line-width':   ['interpolate', ['linear'], ['zoom'], 2, 0.2, 6, 0.6, 10, 1.0],
+      'line-opacity': 0.45
     }
   })
 
-  // Hover highlight
+  // Hover layer — only reacts to filter changes, not GeoJSON rebuilds
   map.addLayer({
     id: 'hex-hover',
     type: 'fill',
     source: 'hexes',
     filter: ['==', 'h3_index', ''],
     paint: {
-      'fill-color': '#b05828',
-      'fill-opacity': 0.25
+      'fill-color':   '#b05828',
+      'fill-opacity': 0.3
     }
   })
 }
 
 function setupEvents() {
-  if (!map) return
-
   map.on('mousemove', 'hex-fill', (e) => {
     map.getCanvas().style.cursor = 'pointer'
     const p = e.features[0].properties
+    // Only update filter and popup — no GeoJSON rebuild
     map.setFilter('hex-hover', ['==', 'h3_index', p.h3_index])
-    popup.value = {
-      x: e.point.x + 14,
-      y: e.point.y - 10,
-      ...p
-    }
+    popup.value = { x: e.point.x + 14, y: e.point.y - 10, ...p }
   })
 
   map.on('mouseleave', 'hex-fill', () => {
@@ -230,8 +192,7 @@ function setupEvents() {
   })
 
   map.on('click', 'hex-fill', (e) => {
-    const p = e.features[0].properties
-    emit('select-hex', p.h3_index)
+    emit('select-hex', e.features[0].properties.h3_index)
     popup.value = null
   })
 
@@ -260,8 +221,17 @@ onMounted(async () => {
   map.addControl(new maptilersdk.NavigationControl(), 'bottom-right')
 
   map.on('load', async () => {
-    await renderHexes()
-    setupEvents()
+    try {
+      // Fetch data and build GeoJSON ONCE
+      const data = await get('/api/hex/biodiversity')
+      geojsonCache = buildGeoJSON(data)
+      addLayers(geojsonCache)
+      setupEvents()
+    } catch (e) {
+      console.error('Failed to load hex data:', e)
+    } finally {
+      loading.value = false
+    }
   })
 })
 
@@ -269,19 +239,57 @@ onUnmounted(() => {
   if (map) map.remove()
 })
 
-watch(() => props.selectedClass, async () => {
-  if (!map || !map.isStyleLoaded()) return
-  const data    = await loadHexData()
-  const geojson = await buildGeoJSON(data)
-  if (map.getSource('hexes')) {
-    map.getSource('hexes').setData(geojson)
+// Class filter — uses MapLibre paint expressions, NO GeoJSON rebuild
+watch(() => props.selectedClass, async (cls) => {
+  if (!map || !map.isStyleLoaded() || !map.getSource('hexes')) return
+
+  if (!cls) {
+    // Show all hexes at full opacity
+    map.setPaintProperty('hex-fill', 'fill-opacity',
+      ['interpolate', ['linear'], ['zoom'], 2, 0.75, 8, 0.88]
+    )
+    return
   }
+
+  // Dim hexes that don't have this class, highlight those that do
+  const countField = {
+    'Mammalia':  'mammal_count',
+    'Aves':      'bird_count',
+    'Reptilia':  'reptile_count',
+    'Amphibia':  'amphibian_count',
+  }[cls] || 'species_count'
+
+  map.setPaintProperty('hex-fill', 'fill-opacity', [
+    'case',
+    ['>', ['get', countField], 0],
+    ['interpolate', ['linear'], ['zoom'], 2, 0.85, 8, 0.95],
+    0.1
+  ])
 })
 </script>
 
 <style scoped>
 .map-wrap { width: 100%; height: 100%; position: relative; }
 .map { width: 100%; height: 100%; }
+
+.map-loading {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(240, 236, 224, 0.8);
+  z-index: 20;
+}
+
+.loading-text {
+  font-size: 13px;
+  color: #706050;
+  background: #f0ece0;
+  padding: 10px 18px;
+  border-radius: 6px;
+  border: 0.5px solid rgba(0,0,0,0.1);
+}
 
 .hex-popup {
   position: absolute;
@@ -305,15 +313,11 @@ watch(() => props.selectedClass, async () => {
 .score-num {
   font-family: Georgia, serif;
   font-size: 22px;
-  font-weight: normal;
   line-height: 1;
   text-shadow: 0 0 8px currentColor;
 }
 
-.score-label {
-  font-size: 10px;
-  color: #a09080;
-}
+.score-label { font-size: 10px; color: #a09080; }
 
 .popup-stats {
   font-size: 11px;
@@ -323,19 +327,9 @@ watch(() => props.selectedClass, async () => {
   gap: 4px;
 }
 
-.popup-classes {
-  display: flex;
-  gap: 5px;
-  flex-wrap: wrap;
-  margin-bottom: 6px;
-}
+.popup-classes { display: flex; gap: 5px; flex-wrap: wrap; margin-bottom: 6px; }
 
-.cls-pill {
-  font-size: 9px;
-  padding: 2px 6px;
-  border-radius: 3px;
-}
-
+.cls-pill { font-size: 9px; padding: 2px 6px; border-radius: 3px; }
 .cls-pill.mammal  { background: rgba(176,88,40,0.12);  color: #b05828; }
 .cls-pill.bird    { background: rgba(72,128,168,0.12); color: #4880a8; }
 .cls-pill.reptile { background: rgba(106,152,72,0.12); color: #6a9848; }
@@ -343,12 +337,11 @@ watch(() => props.selectedClass, async () => {
 
 .popup-hint { font-size: 9px; color: #b0a090; }
 
-/* Legend */
 .legend {
   position: absolute;
   bottom: 32px;
   left: 12px;
-  background: rgba(240, 236, 224, 0.92);
+  background: rgba(240,236,224,0.92);
   border: 0.5px solid rgba(0,0,0,0.1);
   border-radius: 6px;
   padding: 10px 12px;
@@ -365,12 +358,10 @@ watch(() => props.selectedClass, async () => {
   margin-bottom: 7px;
 }
 
-.legend-scale { margin-bottom: 8px; }
-
 .legend-bar {
   height: 8px;
   border-radius: 4px;
-  background: linear-gradient(to right, #e8e4d8, #d4d8c0, #a8bc88, #7a9e58, #3a5820);
+  background: linear-gradient(to right, #e8e4d8, #d4d8c0, #b8c898, #6a9848, #335820);
   margin-bottom: 3px;
 }
 
@@ -379,6 +370,7 @@ watch(() => props.selectedClass, async () => {
   justify-content: space-between;
   font-size: 9px;
   color: #a09080;
+  margin-bottom: 8px;
 }
 
 .legend-classes {
@@ -393,8 +385,7 @@ watch(() => props.selectedClass, async () => {
 
 .cls-dot {
   display: inline-block;
-  width: 8px;
-  height: 8px;
+  width: 8px; height: 8px;
   border-radius: 50%;
   margin-right: 4px;
 }

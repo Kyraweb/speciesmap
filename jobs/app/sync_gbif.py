@@ -20,7 +20,7 @@ GBIF_API       = "https://api.gbif.org/v1/occurrence/search"
 SOURCE_ID      = 1
 CONTINENT      = "NORTH_AMERICA"
 BATCH_SIZE     = 300
-TARGET_CLASSES = ["Mammalia", "Aves", "Reptilia", "Amphibia"]
+TARGET_CLASSES = ["Mammalia", "Reptilia", "Amphibia", "Squamata", "Testudines", "Crocodylia"]
 
 
 def get_connection():

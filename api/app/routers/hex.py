@@ -9,16 +9,10 @@ def get_hex_biodiversity(
     continent: str = Query("North America"),
     class_: str    = Query(None, alias="class"),
 ):
-    """
-    Returns all hex biodiversity scores for a continent.
-    Lightweight — h3_index + scores only.
-    Frontend computes hex boundaries using h3-js.
-    """
     conn = get_connection()
     cur  = conn.cursor()
 
     if class_:
-        # Filter by class — use temporal breakdown for class-specific view
         cur.execute("""
             SELECT
                 si.h3_index,
@@ -57,27 +51,66 @@ def get_hex_biodiversity(
     return results
 
 
-@router.get("/hex/{h3_index}")
-def get_hex_detail(
-    h3_index: str,
-    continent: str = Query("North America"),
-):
-    """
-    Returns species breakdown for a specific hex.
-    Called when user clicks a hex on the map.
-    """
+@router.get("/hex/stats/overview")
+def get_hex_stats(continent: str = Query("North America")):
+    conn = get_connection()
+    cur  = conn.cursor()
+    cur.execute("""
+        SELECT
+            COUNT(*) as hex_count,
+            SUM(species_count) as total_species_records,
+            SUM(sighting_count) as total_sightings,
+            SUM(threatened_count) as total_threatened,
+            MAX(biodiversity_score) as max_score,
+            AVG(biodiversity_score) as avg_score
+        FROM hex_biodiversity
+        WHERE continent = %s
+    """, [continent])
+    stats = cur.fetchone()
+    cur.close()
+    conn.close()
+    return stats
+
+
+@router.get("/stats/global")
+def get_global_stats():
+    """Global platform stats for landing page."""
     conn = get_connection()
     cur  = conn.cursor()
 
-    # Hex summary
-    cur.execute("""
-        SELECT *
-        FROM hex_biodiversity
-        WHERE h3_index = %s
-    """, [h3_index])
+    cur.execute("SELECT COUNT(*) as total FROM sightings")
+    sightings = cur.fetchone()["total"]
+
+    cur.execute("SELECT COUNT(*) as total FROM species")
+    species = cur.fetchone()["total"]
+
+    cur.execute("SELECT COUNT(DISTINCT continent) as total FROM sightings WHERE continent IS NOT NULL")
+    continents = cur.fetchone()["total"]
+
+    cur.execute("SELECT COUNT(*) as total FROM hex_biodiversity")
+    hexes = cur.fetchone()["total"]
+
+    cur.close()
+    conn.close()
+
+    return {
+        "sightings":   sightings,
+        "species":     species,
+        "continents":  continents,
+        "hexes":       hexes,
+        "classes":     3,
+        "data_sources": 4,
+    }
+
+
+@router.get("/hex/{h3_index}")
+def get_hex_detail(h3_index: str, continent: str = Query("North America")):
+    conn = get_connection()
+    cur  = conn.cursor()
+
+    cur.execute("SELECT * FROM hex_biodiversity WHERE h3_index = %s", [h3_index])
     summary = cur.fetchone()
 
-    # Top species in this hex
     cur.execute("""
         SELECT
             sp.common_name,
@@ -95,20 +128,16 @@ def get_hex_detail(
     """, [h3_index])
     species = cur.fetchall()
 
-    # Temporal breakdown for this hex
     cur.execute("""
         SELECT period, class, species_count, sighting_count
-        FROM hex_temporal
-        WHERE h3_index = %s
+        FROM hex_temporal WHERE h3_index = %s
         ORDER BY period, class
     """, [h3_index])
     temporal = cur.fetchall()
 
-    # Seasonal breakdown
     cur.execute("""
         SELECT month, class, sighting_count
-        FROM hex_seasonal
-        WHERE h3_index = %s
+        FROM hex_seasonal WHERE h3_index = %s
         ORDER BY month, class
     """, [h3_index])
     seasonal = cur.fetchall()
@@ -122,28 +151,3 @@ def get_hex_detail(
         "temporal": temporal,
         "seasonal": seasonal,
     }
-
-
-@router.get("/hex/stats/overview")
-def get_hex_stats(continent: str = Query("North America")):
-    """Summary stats for the continent — used in sidebar."""
-    conn = get_connection()
-    cur  = conn.cursor()
-
-    cur.execute("""
-        SELECT
-            COUNT(*) as hex_count,
-            SUM(species_count) as total_species_records,
-            SUM(sighting_count) as total_sightings,
-            SUM(threatened_count) as total_threatened,
-            MAX(biodiversity_score) as max_score,
-            AVG(biodiversity_score) as avg_score,
-            COUNT(DISTINCT continent) as continents
-        FROM hex_biodiversity
-        WHERE continent = %s
-    """, [continent])
-
-    stats = cur.fetchone()
-    cur.close()
-    conn.close()
-    return stats

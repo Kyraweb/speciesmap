@@ -76,3 +76,21 @@ def get_sightings(
     conn.close()
 
     return results
+
+
+@router.get("/sightings/continent-summary")
+def get_continent_summary():
+    """Total sightings per continent — used on landing page."""
+    conn = get_connection()
+    cur  = conn.cursor()
+    cur.execute("""
+        SELECT continent, COUNT(*) as total
+        FROM sightings
+        WHERE continent IS NOT NULL
+        GROUP BY continent
+        ORDER BY total DESC
+    """)
+    results = cur.fetchall()
+    cur.close()
+    conn.close()
+    return results

@@ -1,0 +1,5 @@
+{
+  "name": "SpeciesMap",
+  "description": "A living map of land wildlife drawing from leading scientific databases to reveal where species move, thrive, and disappear.",
+  "requestFramePermissions": []
+}

@@ -39,8 +39,8 @@ export function Globe({ scrollProgress = 0 }: { scrollProgress?: number }) {
   
   // Load Earth Textures
   const [colorMap, bumpMap] = useTexture([
-    'https://raw.githubusercontent.com/vasturiano/three-globe/master/example/img/earth-dark.jpg',
-    'https://raw.githubusercontent.com/vasturiano/three-globe/master/example/img/earth-topology.png',
+    '/textures/earth.jpg',
+    '/textures/earth-normal.jpg',
   ]);
 
   // Generate Observation Points
@@ -103,10 +103,9 @@ export function Globe({ scrollProgress = 0 }: { scrollProgress?: number }) {
         <meshStandardMaterial
           map={colorMap}
           bumpMap={bumpMap}
-          bumpScale={0.08}
-          roughness={0.8}
+          bumpScale={0.05}
           metalness={0.1}
-          color="#333" // Darker base for more depth
+          roughness={0.9}
         />
       </Sphere>
 

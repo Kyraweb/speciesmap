@@ -43,7 +43,7 @@ export function Hero() {
               SpeciesMap — Earth intelligence
             </motion.span>
 
-            <h1 className="text-6xl md:text-7xl lg:text-8xl xl:text-[8.5rem] font-headline font-extrabold tracking-tight leading-[0.88] text-on-surface">
+            <h1 className="text-5xl md:text-6xl lg:text-7xl xl:text-[6.5rem] font-headline font-extrabold tracking-tight leading-[0.88] text-on-surface">
               See where life <br />
               <span className="text-primary/90 italic font-medium">holds, shifts, and fades.</span>
             </h1>
@@ -115,9 +115,9 @@ export function Hero() {
           className="relative order-1 lg:order-2 flex justify-center items-center h-[600px] lg:h-[700px]"
         >
           <Canvas dpr={[1, 2]} camera={{ position: [0, 0, 6], fov: 45 }}>
-            <ambientLight intensity={0.42} />
+            <ambientLight intensity={0.6} />
             <spotLight position={[10, 10, 10]} angle={0.15} penumbra={1} intensity={1.9} color="#ffdbcc" />
-            <pointLight position={[-10, -10, -10]} intensity={0.45} color="#914111" />
+            <pointLight position={[-10, -10, -10]} intensity={1.2} color="#914111" />
             <Float speed={0.9} rotationIntensity={0.08} floatIntensity={0.16}>
               <GlobeWrapper scrollProgress={globeScroll} />
             </Float>

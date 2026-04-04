@@ -18,7 +18,7 @@ app.add_middleware(
         "https://europe.speciesmap.org",
         "https://africa.speciesmap.org",
         "https://asia.speciesmap.org",
-        "https://australia.speciesmap.org",
+        "https://oceania.speciesmap.org",
         "http://localhost:5173",
     ],
     allow_credentials=True,

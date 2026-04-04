@@ -5,6 +5,7 @@ import { ArrowRight, Zap } from 'lucide-react';
 type Region = {
   id: string;
   name: string;
+  url: string;
   sightings: number;
   activeSensors: number;
   threatLevel: 'Stable' | 'Critical' | 'Dynamic' | 'Moderate';
@@ -24,6 +25,7 @@ const baseRegions: Region[] = [
   {
     id: 'NA',
     name: 'North America',
+    url: 'https://northamerica.speciesmap.org/',
     sightings: 6942105,
     activeSensors: 1240,
     threatLevel: 'Stable',
@@ -34,6 +36,7 @@ const baseRegions: Region[] = [
   {
     id: 'SA',
     name: 'South America',
+    url: 'https://southamerica.speciesmap.org/',
     sightings: 1100000,
     activeSensors: 3150,
     threatLevel: 'Critical',
@@ -44,6 +47,7 @@ const baseRegions: Region[] = [
   {
     id: 'EU',
     name: 'Europe',
+    url: 'https://europe.speciesmap.org/',
     sightings: 23400000,
     activeSensors: 2840,
     threatLevel: 'Stable',
@@ -54,6 +58,7 @@ const baseRegions: Region[] = [
   {
     id: 'AF',
     name: 'Africa',
+    url: 'https://africa.speciesmap.org/',
     sightings: 991000,
     activeSensors: 1920,
     threatLevel: 'Dynamic',
@@ -64,6 +69,7 @@ const baseRegions: Region[] = [
   {
     id: 'AS',
     name: 'Asia',
+    url: 'https://asia.speciesmap.org/',
     sightings: 2100000,
     activeSensors: 4200,
     threatLevel: 'Moderate',
@@ -74,6 +80,7 @@ const baseRegions: Region[] = [
   {
     id: 'OC',
     name: 'Oceania',
+    url: 'https://oceania.speciesmap.org/',
     sightings: 5200000,
     activeSensors: 840,
     threatLevel: 'Stable',
@@ -231,7 +238,9 @@ export function GlobalRegistry() {
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 pt-8 border-t border-outline-variant/20">
               {liveSummary.map(([label, value]) => (
                 <div key={label} className="space-y-2">
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/60">{label}</p>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/60">
+                    {label}
+                  </p>
                   <p className="text-3xl md:text-4xl font-headline font-light text-on-surface">{value}</p>
                 </div>
               ))}
@@ -249,8 +258,7 @@ export function GlobalRegistry() {
                 <span className="text-[10px] font-bold uppercase tracking-[0.2em]">Live ingest connected</span>
               </div>
               <p className="text-sm text-on-surface-variant leading-relaxed">
-                This front-end can pull global and regional totals from your live API, so the landing page keeps
-                reflecting the real state of the platform rather than frozen demo numbers.
+                What you see here is not static. The platform reflects live global and regional activity, allowing this surface to stay aligned with the living state of biodiversity data.
               </p>
             </motion.div>
           </div>
@@ -274,7 +282,9 @@ export function GlobalRegistry() {
                   </p>
                 </div>
                 <div className="text-right">
-                  <p className="text-[8px] font-bold uppercase tracking-widest text-on-surface-variant/40">Coordinates</p>
+                  <p className="text-[8px] font-bold uppercase tracking-widest text-on-surface-variant/40">
+                    Coordinates
+                  </p>
                   <p className="text-[10px] font-mono text-secondary">{activeRegion.coordinates}</p>
                 </div>
               </div>
@@ -318,6 +328,17 @@ export function GlobalRegistry() {
                       <div className="space-y-2 relative z-10">
                         <h4 className="text-lg font-headline font-bold text-on-surface">{region.name}</h4>
                         <p className="text-sm text-on-surface-variant/78 leading-relaxed">{region.description}</p>
+
+                        <a
+                          href={region.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-2 pt-2 text-[10px] font-bold uppercase tracking-[0.22em] text-primary hover:text-primary-container transition-colors"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          Open region
+                          <ArrowRight className="w-3.5 h-3.5" />
+                        </a>
                       </div>
                     </button>
                   ))}
@@ -334,7 +355,9 @@ export function GlobalRegistry() {
                       className="space-y-8"
                     >
                       <div className="space-y-4">
-                        <div className="text-[10px] font-bold uppercase tracking-[0.3em] text-primary">Active region</div>
+                        <div className="text-[10px] font-bold uppercase tracking-[0.3em] text-primary">
+                          Active region
+                        </div>
                         <h3 className="text-4xl font-headline font-bold text-on-surface leading-none">
                           {activeRegion.name}
                         </h3>
@@ -343,23 +366,39 @@ export function GlobalRegistry() {
                           understands where they are beginning before the interface later opens into species,
                           patterns, and deeper ecological context.
                         </p>
+
+                        <a
+                          href={activeRegion.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-3 bg-primary text-on-primary px-8 py-4 text-[10px] font-bold uppercase tracking-[0.28em] hover:bg-primary-container transition-all editorial-shadow"
+                        >
+                          Open regional map
+                          <ArrowRight className="w-4 h-4" />
+                        </a>
                       </div>
 
                       <div className="grid grid-cols-2 gap-6 border-t border-outline-variant/12 pt-6">
                         <div className="space-y-2">
-                          <div className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/45">Sightings</div>
+                          <div className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/45">
+                            Sightings
+                          </div>
                           <div className="text-3xl font-headline text-on-surface">
                             <CountUp value={activeRegion.sightings} />
                           </div>
                         </div>
                         <div className="space-y-2">
-                          <div className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/45">Active nodes</div>
+                          <div className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/45">
+                            Active nodes
+                          </div>
                           <div className="text-3xl font-headline text-on-surface">
                             <CountUp value={activeRegion.activeSensors} />
                           </div>
                         </div>
                         <div className="space-y-2 col-span-2">
-                          <div className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/45">Signal profile</div>
+                          <div className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/45">
+                            Signal profile
+                          </div>
                           <div className="inline-flex px-3 py-1.5 bg-primary/6 border border-primary/14 rounded-sm text-xs uppercase tracking-[0.24em] font-bold text-primary">
                             {activeRegion.threatLevel}
                           </div>
@@ -377,11 +416,17 @@ export function GlobalRegistry() {
                       roadmap: species-first navigation, time-aware biodiversity, and deeper ecological context.
                     </p>
                     <div className="flex flex-wrap gap-4">
-                      <a href="#methodology" className="inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.24em] text-primary hover:text-primary-container transition-colors">
+                      <a
+                        href="#methodology"
+                        className="inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.24em] text-primary hover:text-primary-container transition-colors"
+                      >
                         Read the system
                         <ArrowRight className="w-3.5 h-3.5" />
                       </a>
-                      <a href="#roadmap" className="inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.24em] text-on-surface-variant/60 hover:text-primary transition-colors">
+                      <a
+                        href="#roadmap"
+                        className="inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.24em] text-on-surface-variant/60 hover:text-primary transition-colors"
+                      >
                         See the roadmap
                         <ArrowRight className="w-3.5 h-3.5" />
                       </a>

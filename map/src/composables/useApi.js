@@ -1,23 +1,22 @@
-/**
- * useApi — base fetch helper scoped to current continent.
- * Automatically appends ?continent=North America to all requests.
- */
 import { useContinent } from './useContinent'
 
-const BASE_URL = import.meta.env.VITE_API_URL ?? ''
+const API_BASE = import.meta.env.VITE_API_URL ?? 'https://api.speciesmap.org'
 
 export function useApi() {
   const { continent } = useContinent()
 
   async function get(path, params = {}) {
-    const url = new URL(`${BASE_URL}${path}`, window.location.origin)
-    url.searchParams.set('continent', continent)
-    Object.entries(params).forEach(([k, v]) => {
+    // Always inject continent unless explicitly overridden
+    const finalParams = { continent, ...params }
+
+    const url = new URL(API_BASE + path)
+    Object.entries(finalParams).forEach(([k, v]) => {
       if (v !== null && v !== undefined) url.searchParams.set(k, v)
     })
-    const res = await fetch(url.toString())
-    if (!res.ok) throw new Error(`API error ${res.status} on ${path}`)
-    return res.json()
+
+    const resp = await fetch(url.toString())
+    if (!resp.ok) throw new Error(`API error ${resp.status}: ${path}`)
+    return resp.json()
   }
 
   return { get, continent }

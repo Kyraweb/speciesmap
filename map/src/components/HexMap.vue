@@ -115,6 +115,12 @@ function buildGeoJSON(data) {
       const coords   = boundary.map(([lat, lng]) => [lng, lat])
       coords.push(coords[0]) // close the polygon
 
+      // Skip hexes that cross the antimeridian (lng range > 180°)
+      // These create a horizontal stripe across the entire map in MapLibre
+      const lngs = coords.map(c => c[0])
+      const lngRange = Math.max(...lngs) - Math.min(...lngs)
+      if (lngRange > 180) continue
+
       features.push({
         type: 'Feature',
         geometry: { type: 'Polygon', coordinates: [coords] },

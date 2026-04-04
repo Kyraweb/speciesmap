@@ -40,7 +40,7 @@ const CONTINENT_BOUNDS = {
   europe:       [ -28.0,  32.0,   48.0,  74.0],
   africa:       [ -20.0, -37.0,   54.0,  40.0],
   asia:         [  24.0,  -1.0,  182.0,  80.0],
-  australia:    [ 110.0, -47.0,  157.0,  -8.0],
+  oceania:      [ 110.0, -47.0,  157.0,  -8.0],
 }
 
 const CONTINENT_VIEW = {
@@ -49,7 +49,7 @@ const CONTINENT_VIEW = {
   europe:       { center: [ 10.0,  54.0], zoom: 3.5 },
   africa:       { center: [ 18.0,   2.0], zoom: 3   },
   asia:         { center: [ 95.0,  40.0], zoom: 2.5 },
-  australia:    { center: [134.0, -27.0], zoom: 3.5 },
+  oceania:      { center: [134.0, -27.0], zoom: 3.5 },
 }
 
 const IUCN_STYLES = {

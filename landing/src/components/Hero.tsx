@@ -53,12 +53,12 @@ export function Hero() {
       className="relative min-h-screen flex flex-col items-center justify-center overflow-hidden px-6 md:px-8 pt-24 scroll-mt-24"
     >
       <div className="absolute inset-0 z-0 flex items-center justify-center opacity-40 mix-blend-multiply">
-        <div className="relative h-[34rem] w-[34rem] sm:h-[44rem] sm:w-[44rem] lg:h-[62rem] lg:w-[62rem] rounded-full bg-gradient-to-tr from-surface-container-high via-surface-variant to-primary-fixed blur-[120px] animate-pulse" />
-        <div className="absolute h-[22rem] w-[22rem] sm:h-[30rem] sm:w-[30rem] lg:h-[47rem] lg:w-[47rem] border-[0.5px] border-primary/10 rounded-full" />
-        <div className="absolute h-[15rem] w-[15rem] sm:h-[22rem] sm:w-[22rem] lg:h-[35rem] lg:w-[35rem] border-[0.5px] border-primary/16 rounded-full" />
+        <div className="relative h-[34rem] w-[34rem] sm:h-[44rem] sm:w-[44rem] lg:h-[68rem] lg:w-[68rem] rounded-full bg-gradient-to-tr from-surface-container-high via-surface-variant to-primary-fixed blur-[120px] animate-pulse" />
+        <div className="absolute h-[22rem] w-[22rem] sm:h-[30rem] sm:w-[30rem] lg:h-[52rem] lg:w-[52rem] border-[0.5px] border-primary/10 rounded-full" />
+        <div className="absolute h-[15rem] w-[15rem] sm:h-[22rem] sm:w-[22rem] lg:h-[39rem] lg:w-[39rem] border-[0.5px] border-primary/16 rounded-full" />
       </div>
 
-      <div className="relative z-10 w-full max-w-7xl grid grid-cols-1 lg:grid-cols-2 items-center gap-10 lg:gap-20">
+      <div className="relative z-10 w-full max-w-7xl grid grid-cols-1 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] items-center gap-10 lg:gap-10 xl:gap-14">
         <motion.div
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
@@ -75,7 +75,7 @@ export function Hero() {
               SpeciesMap / Earth intelligence
             </motion.span>
 
-            <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl xl:text-[6.9rem] font-headline font-extrabold tracking-tight leading-[0.9] text-on-surface">
+            <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-[6.15rem] xl:text-[7.1rem] font-headline font-extrabold tracking-tight leading-[0.9] text-on-surface">
               See where life
               <br />
               <span className="text-primary/90 italic font-medium">holds, shifts, and fades.</span>
@@ -145,26 +145,26 @@ export function Hero() {
           initial={{ opacity: 0, scale: 0.88 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 1.4, ease: [0.22, 1, 0.36, 1] }}
-          className="relative order-1 lg:order-2 flex justify-center items-center h-[280px] sm:h-[360px] lg:h-[700px] pointer-events-none lg:pointer-events-auto"
+          className="relative order-1 lg:order-2 hidden lg:flex justify-center items-center h-[760px] xl:h-[840px] pointer-events-auto"
         >
           <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
-            <div className="h-[18rem] w-[18rem] sm:h-[22rem] sm:w-[22rem] lg:h-[32rem] lg:w-[32rem] rounded-full bg-primary/6 blur-[100px]" />
+            <div className="h-[34rem] w-[34rem] xl:h-[40rem] xl:w-[40rem] rounded-full bg-primary/7 blur-[120px]" />
           </div>
 
-          <div className="relative w-full max-w-[22rem] sm:max-w-[28rem] lg:max-w-none">
-            <Canvas dpr={[1, 2]} camera={{ position: [0, 0, 6], fov: isDesktop ? 45 : 50 }}>
-              <ambientLight intensity={isDesktop ? 0.72 : 0.62} color="#fff7ee" />
-              <hemisphereLight intensity={0.42} color="#fff5e9" groundColor="#dfd0bf" />
-              <directionalLight position={[4.5, 2.5, 5]} intensity={1.8} color="#fff1df" />
-              <directionalLight position={[-4, -1.75, 3.5]} intensity={0.65} color="#f0dcc9" />
-              <pointLight position={[0, -3.5, 4]} intensity={0.28} color="#ffefe1" />
+          <div className="relative w-full h-full translate-x-[4%] xl:translate-x-[7%]">
+            <Canvas dpr={[1, 2]} camera={{ position: [0, 0, 5.3], fov: 40 }}>
+              <ambientLight intensity={0.78} color="#fff7ee" />
+              <hemisphereLight intensity={0.46} color="#fff5e9" groundColor="#dfd0bf" />
+              <directionalLight position={[4.5, 2.5, 5]} intensity={1.95} color="#fff1df" />
+              <directionalLight position={[-4, -1.75, 3.5]} intensity={0.72} color="#f0dcc9" />
+              <pointLight position={[0, -3.5, 4]} intensity={0.32} color="#ffefe1" />
 
               <Float
-                speed={isDesktop ? 0.9 : 0.55}
-                rotationIntensity={isDesktop ? 0.08 : 0.03}
-                floatIntensity={isDesktop ? 0.16 : 0.08}
+                speed={0.9}
+                rotationIntensity={0.08}
+                floatIntensity={0.16}
               >
-                <group scale={isDesktop ? 1 : 0.82}>
+                <group scale={1.2} position={[0.2, 0, 0]}>
                   <Globe scrollProgress={globeProgress} />
                 </group>
               </Float>
@@ -174,7 +174,7 @@ export function Hero() {
                 enablePan={false}
                 autoRotate
                 autoRotateSpeed={0.12}
-                enabled={isDesktop}
+                enabled={true}
               />
               <Environment preset="sunset" />
             </Canvas>

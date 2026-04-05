@@ -3,7 +3,9 @@
     <div class="detail-panel" v-if="species">
       <div class="dp-header">
         <button class="back-btn" @click="$emit('close')">
-          <svg width="14" height="14" viewBox="0 0 14 14"><path d="M9 2L5 7l4 5" stroke="currentColor" stroke-width="1.3" fill="none" stroke-linecap="round"/></svg>
+          <svg width="14" height="14" viewBox="0 0 14 14">
+            <path d="M9 2L5 7l4 5" stroke="currentColor" stroke-width="1.3" fill="none" stroke-linecap="round"/>
+          </svg>
           Back
         </button>
         <button class="xbtn" @click="$emit('close')">✕</button>
@@ -17,7 +19,7 @@
       <div v-else-if="detail" class="dp-body">
         <div class="dp-name-block">
           <div class="dp-class-dot" :style="{ background: classColor }"></div>
-          <div>
+          <div class="dp-name-text">
             <div class="dp-name">{{ detail.display_name }}</div>
             <div class="dp-latin" v-if="detail.common_name">{{ detail.scientific_name }}</div>
           </div>
@@ -45,6 +47,7 @@
           </div>
         </div>
 
+        <!-- Trend chart -->
         <div class="dp-section" v-if="trendData.length">
           <div class="dp-section-label">Sightings over time</div>
           <div class="trend-bars">
@@ -62,7 +65,8 @@
           </div>
         </div>
 
-        <div class="dp-section" v-if="seasonalData.length">
+        <!-- Seasonal chart -->
+        <div class="dp-section" v-if="hasSeasonalData">
           <div class="dp-section-label">Monthly activity</div>
           <div class="seasonal-bars">
             <div v-for="m in seasonalData" :key="m.month" class="s-bar-wrap">
@@ -75,6 +79,7 @@
           </div>
         </div>
 
+        <!-- Taxonomy -->
         <div class="dp-section" v-if="detail.order_name || detail.family">
           <div class="dp-section-label">Taxonomy</div>
           <div class="dp-tax">
@@ -92,7 +97,7 @@
         </div>
       </div>
 
-      <div v-else class="dp-loading">No data available</div>
+      <div v-else-if="!loading" class="dp-loading">No data available</div>
     </div>
   </transition>
 </template>
@@ -107,14 +112,16 @@ const props = defineProps({
 defineEmits(['close'])
 
 const { get } = useApi()
+
 const detail   = ref(null)
+const rawData  = ref(null)
 const loading  = ref(false)
 
+// AbortController to cancel in-flight requests when species changes
+let abortController = null
+
 const CLASS_COLORS = {
-  Mammalia: '#b05828',
-  Aves:     '#4880a8',
-  Reptilia: '#6a9848',
-  Amphibia: '#8858b0',
+  Mammalia: '#b05828', Reptilia: '#6a9848', Amphibia: '#8858b0', Aves: '#4880a8'
 }
 
 const IUCN_STYLES = {
@@ -126,42 +133,21 @@ const IUCN_STYLES = {
 }
 
 const IUCN_LABELS = {
-  CR: 'Critically endangered',
-  EN: 'Endangered',
-  VU: 'Vulnerable',
-  NT: 'Near threatened',
-  LC: 'Least concern',
-  DD: 'Data deficient',
+  CR: 'Critically endangered', EN: 'Endangered', VU: 'Vulnerable',
+  NT: 'Near threatened',       LC: 'Least concern', DD: 'Data deficient'
 }
 
-function iucnStyle(code) {
-  return IUCN_STYLES[code] ?? { background: '#f1efe8', color: '#a09080' }
-}
-
-function iucnLabel(code) {
-  return IUCN_LABELS[code] ?? code
-}
+function iucnStyle(code)  { return IUCN_STYLES[code] ?? { background: '#f1efe8', color: '#a09080' } }
+function iucnLabel(code)  { return IUCN_LABELS[code] ?? code }
 
 function fmt(n) {
   if (!n) return '—'
   if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M'
-  if (n >= 1000) return (n / 1000).toFixed(0) + 'k'
+  if (n >= 1000)    return (n / 1000).toFixed(0) + 'k'
   return n.toLocaleString()
 }
 
-const classColor = computed(() =>
-  CLASS_COLORS[detail.value?.class] ?? '#6a9848'
-)
-
-const firstYear = computed(() => {
-  const t = trendData.value
-  return t.length ? t[0].year : '—'
-})
-
-const lastYear = computed(() => {
-  const t = trendData.value
-  return t.length ? t[t.length - 1].year : '—'
-})
+const classColor = computed(() => CLASS_COLORS[detail.value?.class] ?? '#6a9848')
 
 const trendData = computed(() => {
   const t   = rawData.value?.trend ?? []
@@ -175,26 +161,36 @@ const seasonalData = computed(() => {
     if (s.month >= 1 && s.month <= 12) monthly[s.month - 1] += s.count
   })
   const max = Math.max(...monthly, 1)
-  return monthly.map((count, i) => ({
-    month: i + 1, count, pct: Math.round((count / max) * 100)
-  }))
+  return monthly.map((count, i) => ({ month: i + 1, count, pct: Math.round((count / max) * 100) }))
 })
 
-// Raw API response
-const rawData = ref(null)
+const hasSeasonalData = computed(() => seasonalData.value.some(m => m.count > 0))
 
-// immediate: true so it fires when component mounts with an already-set species
+const firstYear = computed(() => trendData.value[0]?.year ?? '—')
+const lastYear  = computed(() => trendData.value[trendData.value.length - 1]?.year ?? '—')
+
 watch(() => props.species, async (sp) => {
-  if (!sp?.id) return
-  loading.value = true
-  detail.value  = null
-  rawData.value = null
+  // Cancel any in-flight request
+  if (abortController) abortController.abort()
+
+  if (!sp?.id) {
+    detail.value  = null
+    rawData.value = null
+    return
+  }
+
+  abortController = new AbortController()
+  loading.value   = true
+  detail.value    = null
+  rawData.value   = null
+
   try {
-    const resp = await get(`/api/species/${sp.id}`)
+    const resp    = await get(`/api/species/${sp.id}`)
+    // Only update if this request wasn't aborted (still the current species)
     rawData.value = resp
     detail.value  = resp.detail
   } catch (e) {
-    console.error('Failed to load species detail:', e)
+    if (e.name !== 'AbortError') console.error('Failed to load species detail:', e)
   } finally {
     loading.value = false
   }
@@ -205,15 +201,11 @@ watch(() => props.species, async (sp) => {
 .detail-panel {
   position: absolute; top: 0; right: 0;
   width: 270px; height: 100%;
-  background: #f0ece0;
-  border-left: 0.5px solid rgba(0,0,0,0.09);
-  display: flex; flex-direction: column;
-  z-index: 10; overflow: hidden;
+  background: #f0ece0; border-left: 0.5px solid rgba(0,0,0,0.09);
+  display: flex; flex-direction: column; z-index: 10; overflow: hidden;
 }
 
-.slide-enter-active, .slide-leave-active {
-  transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1);
-}
+.slide-enter-active, .slide-leave-active { transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1); }
 .slide-enter-from, .slide-leave-to { transform: translateX(100%); }
 
 .dp-header {
@@ -225,14 +217,13 @@ watch(() => props.species, async (sp) => {
 .back-btn {
   display: flex; align-items: center; gap: 4px;
   font-size: 12px; color: #b05828; background: none; border: none;
-  cursor: pointer; font-family: inherit;
+  cursor: pointer; font-family: inherit; padding: 0;
 }
 
 .xbtn {
   width: 22px; height: 22px; border-radius: 4px;
-  border: 0.5px solid rgba(0,0,0,0.1);
-  background: rgba(0,0,0,0.04); cursor: pointer;
-  font-size: 11px; color: #908070;
+  border: 0.5px solid rgba(0,0,0,0.1); background: rgba(0,0,0,0.04);
+  cursor: pointer; font-size: 11px; color: #908070;
 }
 
 .dp-loading {
@@ -243,51 +234,47 @@ watch(() => props.species, async (sp) => {
 
 .dp-spinner {
   width: 20px; height: 20px; border-radius: 50%;
-  border: 2px solid rgba(0,0,0,0.08);
-  border-top-color: #6a9848;
+  border: 2px solid rgba(0,0,0,0.08); border-top-color: #6a9848;
   animation: spin 0.8s linear infinite;
 }
-
 @keyframes spin { to { transform: rotate(360deg); } }
 
-.dp-body {
-  overflow-y: auto; flex: 1; padding: 14px;
-  display: flex; flex-direction: column; gap: 14px;
-}
+.dp-body { overflow-y: auto; flex: 1; padding: 14px; display: flex; flex-direction: column; gap: 14px; }
 
 .dp-name-block { display: flex; gap: 10px; align-items: flex-start; }
-.dp-class-dot { width: 10px; height: 10px; border-radius: 50%; margin-top: 4px; flex-shrink: 0; }
-.dp-name { font-family: Georgia, serif; font-size: 16px; color: #2a2418; line-height: 1.25; }
+.dp-class-dot  { width: 10px; height: 10px; border-radius: 50%; margin-top: 5px; flex-shrink: 0; }
+.dp-name-text  { flex: 1; min-width: 0; }
+.dp-name  { font-family: Georgia, serif; font-size: 16px; color: #2a2418; line-height: 1.25; }
 .dp-latin { font-size: 11px; color: #a09080; font-style: italic; margin-top: 2px; }
 
 .dp-badges { display: flex; flex-wrap: wrap; gap: 5px; }
-.dp-badge { font-size: 10px; padding: 3px 8px; border-radius: 4px; }
+.dp-badge       { font-size: 10px; padding: 3px 8px; border-radius: 4px; }
 .dp-class-badge { font-size: 10px; padding: 3px 8px; border-radius: 4px; background: rgba(0,0,0,0.06); color: #706050; }
 
 .dp-stats {
   display: grid; grid-template-columns: repeat(3, 1fr);
   gap: 1px; background: rgba(0,0,0,0.08); border-radius: 6px; overflow: hidden;
 }
-.dp-stat { background: #e8e4d8; padding: 8px 6px; text-align: center; }
+.dp-stat     { background: #e8e4d8; padding: 8px 6px; text-align: center; }
 .dp-stat-num { font-size: 14px; color: #6a9848; text-shadow: 0 0 8px rgba(106,152,72,0.3); line-height: 1; }
 .dp-stat-lbl { font-size: 9px; color: #a09080; margin-top: 2px; }
 
-.dp-section { display: flex; flex-direction: column; gap: 7px; }
+.dp-section     { display: flex; flex-direction: column; gap: 7px; }
 .dp-section-label { font-size: 10px; font-weight: 500; letter-spacing: 0.8px; color: #a09080; text-transform: uppercase; }
 
-.trend-bars { display: flex; gap: 2px; align-items: flex-end; height: 44px; }
-.t-bar-wrap { flex: 1; height: 100%; display: flex; align-items: flex-end; cursor: default; }
-.t-bar { width: 100%; border-radius: 1px 1px 0 0; min-height: 2px; opacity: 0.8; }
+.trend-bars   { display: flex; gap: 2px; align-items: flex-end; height: 44px; }
+.t-bar-wrap   { flex: 1; height: 100%; display: flex; align-items: flex-end; }
+.t-bar        { width: 100%; border-radius: 1px 1px 0 0; min-height: 2px; opacity: 0.8; }
 .trend-labels { display: flex; justify-content: space-between; font-size: 9px; color: #b0a090; }
 
-.seasonal-bars { display: flex; gap: 2px; align-items: flex-end; height: 36px; }
-.s-bar-wrap { flex: 1; height: 100%; display: flex; align-items: flex-end; }
-.s-bar { width: 100%; border-radius: 1px 1px 0 0; min-height: 2px; opacity: 0.75; }
+.seasonal-bars   { display: flex; gap: 2px; align-items: flex-end; height: 36px; }
+.s-bar-wrap      { flex: 1; height: 100%; display: flex; align-items: flex-end; }
+.s-bar           { width: 100%; border-radius: 1px 1px 0 0; min-height: 2px; opacity: 0.75; }
 .seasonal-labels { display: flex; justify-content: space-between; font-size: 9px; color: #b0a090; }
 
-.dp-tax { display: flex; flex-direction: column; gap: 5px; }
-.tax-row { display: flex; justify-content: space-between; font-size: 11px; gap: 8px; }
+.dp-tax     { display: flex; flex-direction: column; gap: 5px; }
+.tax-row    { display: flex; justify-content: space-between; font-size: 11px; gap: 8px; }
 .tax-row span:first-child { color: #a09080; flex-shrink: 0; }
-.tax-row span:last-child { color: #2a2418; text-align: right; }
+.tax-row span:last-child  { color: #2a2418; text-align: right; }
 .tax-italic { font-style: italic; }
 </style>

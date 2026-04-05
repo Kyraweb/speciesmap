@@ -139,3 +139,24 @@ def get_species_detail(
     cur.close()
     conn.close()
     return {"detail": detail, "trend": trend, "seasonal": seasonal}
+
+
+@router.get("/species/{species_id}/hexes")
+def get_species_hexes(
+    species_id: str,
+    continent:  str = Query("North America"),
+):
+    """Which hexes contain this species — for map highlighting."""
+    conn = get_connection()
+    cur  = conn.cursor()
+    cur.execute("""
+        SELECT DISTINCT h3_index
+        FROM sightings
+        WHERE species_id = %s
+        AND continent = %s
+        AND h3_index IS NOT NULL
+    """, [species_id, continent])
+    results = cur.fetchall()
+    cur.close()
+    conn.close()
+    return results

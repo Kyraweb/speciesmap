@@ -13,11 +13,17 @@
       </div>
       <div class="view-toggle">
         <button class="vtab" :class="{ active: viewMode === 'hex' }" @click="setView('hex')">
-          <svg width="13" height="13" viewBox="0 0 14 14"><polygon points="7,1 13,4.5 13,9.5 7,13 1,9.5 1,4.5" fill="none" stroke="currentColor" stroke-width="1.3"/></svg>
+          <svg width="13" height="13" viewBox="0 0 14 14">
+            <polygon points="7,1 13,4.5 13,9.5 7,13 1,9.5 1,4.5" fill="none" stroke="currentColor" stroke-width="1.3"/>
+          </svg>
           Biodiversity
         </button>
         <button class="vtab" :class="{ active: viewMode === 'dots' }" @click="setView('dots')">
-          <svg width="13" height="13" viewBox="0 0 14 14"><circle cx="4" cy="4" r="2.5" fill="currentColor" opacity="0.6"/><circle cx="10" cy="9" r="2.5" fill="currentColor" opacity="0.6"/><circle cx="7" cy="6" r="2" fill="currentColor"/></svg>
+          <svg width="13" height="13" viewBox="0 0 14 14">
+            <circle cx="4" cy="4" r="2.5" fill="currentColor" opacity="0.6"/>
+            <circle cx="10" cy="9" r="2.5" fill="currentColor" opacity="0.6"/>
+            <circle cx="7" cy="6" r="2" fill="currentColor"/>
+          </svg>
           Sightings
         </button>
       </div>
@@ -30,46 +36,47 @@
       <aside class="sidebar-wrap">
         <Sidebar
           :selected-class="selectedClass"
+          :view-mode="viewMode"
           :sighting-count="hexStats?.total_sightings || 0"
           :species-count="hexStats?.total_species_records || 0"
-          :view-mode="viewMode"
           @filter-class="onFilterClass"
         />
       </aside>
 
-      <!-- Species slide-in panel -->
+      <!--
+        Species panel only shows in SIGHTINGS mode.
+        In biodiversity mode, the sidebar shows class info but doesn't slide the species panel.
+      -->
       <SpeciesPanel
-        v-if="selectedClass"
+        v-if="viewMode === 'dots' && selectedClass"
         :selected-class="selectedClass"
         :selected-species="selectedSpecies"
         @close="onClosePanel"
         @select-species="onSelectSpecies"
       />
 
-      <!-- Map area -->
       <main class="map-area">
         <HexMap
           v-if="viewMode === 'hex'"
           :selected-class="selectedClass"
-          :selected-species-id="selectedSpecies?.id || null"
           @select-hex="onSelectHex"
         />
         <FlatMap
           v-else
           :sightings="sightings"
-          :selected-class="selectedClass"
           :loading="loadingSightings"
           @select-species="onSelectSpeciesFromMap"
         />
       </main>
 
-      <!-- Right detail panels -->
+      <!-- Hex detail panel — biodiversity mode only -->
       <HexDetail
         v-if="viewMode === 'hex'"
         :hex-index="selectedHex"
         @close="selectedHex = null"
-        @select-species="onSelectSpecies"
       />
+
+      <!-- Species detail panel — shown in both modes when a species is selected -->
       <DetailPanel
         v-if="selectedSpecies"
         :species="selectedSpecies"
@@ -80,7 +87,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, watch, onMounted } from 'vue'
 import { useApi } from './composables/useApi'
 import { useContinent, navigateToContinent } from './composables/useContinent'
 import Sidebar      from './components/Sidebar.vue'
@@ -93,22 +100,22 @@ import HexDetail    from './components/HexDetail.vue'
 const { get } = useApi()
 const { slug: currentSlug } = useContinent()
 
-const viewMode        = ref('hex')
-const sightings       = ref([])
-const hexStats        = ref(null)
-const selectedClass   = ref(null)
-const selectedHex     = ref(null)
-const selectedSpecies = ref(null)
+const viewMode         = ref('hex')
+const sightings        = ref([])
+const hexStats         = ref(null)
+const selectedClass    = ref(null)
+const selectedHex      = ref(null)
+const selectedSpecies  = ref(null)
 const loadingSightings = ref(false)
-const loadingMsg      = ref('')
+const loadingMsg       = ref('')
 
 const continents = [
-  { name: 'N. America',  slug: 'northamerica' },
-  { name: 'S. America',  slug: 'southamerica' },
-  { name: 'Europe',      slug: 'europe' },
-  { name: 'Africa',      slug: 'africa' },
-  { name: 'Asia',        slug: 'asia' },
-  { name: 'Oceania',     slug: 'oceania' },
+  { name: 'N. America', slug: 'northamerica' },
+  { name: 'S. America', slug: 'southamerica' },
+  { name: 'Europe',     slug: 'europe'       },
+  { name: 'Africa',     slug: 'africa'       },
+  { name: 'Asia',       slug: 'asia'         },
+  { name: 'Oceania',    slug: 'oceania'      },
 ]
 
 function switchContinent(slug) {
@@ -118,27 +125,43 @@ function switchContinent(slug) {
 
 function setView(mode) {
   viewMode.value = mode
-  selectedHex.value = null
-  if (mode === 'dots') loadSightings()
+  selectedSpecies.value = null  // Reset species when switching views
+  selectedHex.value     = null
+
+  if (mode === 'dots') {
+    // Load sightings for current class filter (or all if none)
+    loadSightings()
+  }
 }
 
 function onFilterClass(cls) {
+  // Toggle off if already selected
+  if (selectedClass.value === cls) {
+    selectedClass.value   = null
+    selectedSpecies.value = null
+    if (viewMode.value === 'dots') loadSightings()
+    return
+  }
+
   selectedClass.value   = cls
   selectedSpecies.value = null
   selectedHex.value     = null
-  // In sightings mode, reload when class changes
-  if (viewMode.value === 'dots') loadSightings()
+
+  if (viewMode.value === 'dots') {
+    loadSightings()
+  }
+  // In hex mode — class filter handled by HexMap paint expression, nothing to load
 }
 
 function onClosePanel() {
   selectedClass.value   = null
   selectedSpecies.value = null
+  if (viewMode.value === 'dots') loadSightings()
 }
 
 function onSelectSpecies(sp) {
   selectedSpecies.value = sp
   selectedHex.value     = null
-  // In sightings mode, load sightings for this specific species
   if (viewMode.value === 'dots') loadSightingsForSpecies(sp)
 }
 
@@ -156,7 +179,7 @@ async function loadSightings() {
   loadingSightings.value = true
   loadingMsg.value = 'Loading sightings...'
   try {
-    const params = { limit: 2000 }
+    const params = {}
     if (selectedClass.value) params.class = selectedClass.value
     sightings.value = await get('/api/sightings', params)
   } catch (e) {
@@ -169,7 +192,7 @@ async function loadSightings() {
 
 async function loadSightingsForSpecies(sp) {
   loadingSightings.value = true
-  loadingMsg.value = `Loading ${sp.display_name}...`
+  loadingMsg.value = `Locating ${sp.display_name}...`
   try {
     sightings.value = await get('/api/sightings', { species_id: sp.id })
   } catch (e) {
@@ -194,8 +217,7 @@ onMounted(() => loadHexStats())
 .topnav {
   display: flex; align-items: center; gap: 8px;
   padding: 0 14px; height: 48px;
-  background: #e8e4d8;
-  border-bottom: 0.5px solid rgba(0,0,0,0.09);
+  background: #e8e4d8; border-bottom: 0.5px solid rgba(0,0,0,0.09);
   flex-shrink: 0; z-index: 20; position: relative;
 }
 
@@ -204,11 +226,10 @@ onMounted(() => loadHexStats())
 
 .continent-tabs { display: flex; gap: 2px; background: rgba(0,0,0,0.06); border-radius: 5px; padding: 3px; }
 .ctab {
-  padding: 4px 8px; font-size: 11px; border-radius: 3px;
-  cursor: pointer; color: #a09080;
-  transition: background 0.15s, color 0.15s; white-space: nowrap;
+  padding: 4px 8px; font-size: 11px; border-radius: 3px; cursor: pointer;
+  color: #a09080; transition: background 0.15s, color 0.15s; white-space: nowrap;
 }
-.ctab:hover { color: #2a2418; background: rgba(0,0,0,0.04); }
+.ctab:hover  { color: #2a2418; background: rgba(0,0,0,0.04); }
 .ctab.active { background: #f0ece0; color: #2a2418; }
 
 .view-toggle { display: flex; gap: 2px; background: rgba(0,0,0,0.06); border-radius: 5px; padding: 3px; }
@@ -216,8 +237,7 @@ onMounted(() => loadHexStats())
   display: flex; align-items: center; gap: 5px;
   padding: 4px 9px; font-size: 11px; border-radius: 3px;
   border: none; background: none; cursor: pointer;
-  color: #a09080; font-family: inherit;
-  transition: background 0.15s, color 0.15s;
+  color: #a09080; font-family: inherit; transition: background 0.15s, color 0.15s;
 }
 .vtab.active { background: #f0ece0; color: #2a2418; }
 

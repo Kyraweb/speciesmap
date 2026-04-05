@@ -52,7 +52,8 @@ import { useContinent } from '../composables/useContinent'
 import { useApi } from '../composables/useApi'
 
 const props = defineProps({
-  selectedClass: { type: String, default: null },
+  selectedClass:     { type: String, default: null },
+  selectedSpeciesId: { type: String, default: null },
 })
 
 const emit = defineEmits(['select-hex'])
@@ -258,6 +259,42 @@ onMounted(async () => {
 
 onUnmounted(() => {
   if (map) map.remove()
+})
+
+// Species filter — highlight hexes containing this species
+watch(() => props.selectedSpeciesId, async (speciesId) => {
+  if (!map || !map.isStyleLoaded() || !map.getSource('hexes')) return
+  if (!speciesId) {
+    // Reset to class filter
+    map.setPaintProperty('hex-fill', 'fill-opacity',
+      ['interpolate', ['linear'], ['zoom'], 2, 0.75, 8, 0.88]
+    )
+    return
+  }
+  // Fetch which hexes contain this species
+  try {
+    const { continent } = useContinent()
+    const resp = await fetch(
+      `https://api.speciesmap.org/api/species/${speciesId}/hexes?continent=${encodeURIComponent(continent)}`
+    )
+    const hexes = await resp.json()
+    const hexSet = new Set(hexes.map(h => h.h3_index))
+    // Update GeoJSON to mark which hexes have this species
+    const src = map.getSource('hexes')
+    const data = src._data
+    data.features.forEach(f => {
+      f.properties.has_species = hexSet.has(f.properties.h3_index) ? 1 : 0
+    })
+    src.setData(data)
+    map.setPaintProperty('hex-fill', 'fill-opacity', [
+      'case',
+      ['==', ['get', 'has_species'], 1],
+      ['interpolate', ['linear'], ['zoom'], 2, 0.9, 8, 1.0],
+      0.08
+    ])
+  } catch (e) {
+    console.error('Failed to load species hexes:', e)
+  }
 })
 
 // Class filter — uses MapLibre paint expressions, NO GeoJSON rebuild

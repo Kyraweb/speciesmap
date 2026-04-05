@@ -76,7 +76,7 @@ export function Hero() {
               SpeciesMap / Earth intelligence
             </motion.span>
 
-            <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-[6rem] xl:text-[6.8rem] font-headline font-extrabold tracking-tight leading-[0.9] text-on-surface">
+            <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-[5.35rem] xl:text-[6rem] font-headline font-extrabold tracking-tight leading-[0.92] text-on-surface">
               See where life
               <br />
               <span className="text-primary/90 italic font-medium">holds, shifts, and fades.</span>
@@ -155,7 +155,7 @@ export function Hero() {
           </div>
 
           <div className="relative flex h-full w-full items-center justify-center translate-x-[2%] xl:translate-x-[4%]">
-            <div className="relative h-[520px] w-[520px] xl:h-[620px] xl:w-[620px] rounded-full overflow-hidden">
+            <div className="relative h-[560px] w-[560px] xl:h-[660px] xl:w-[660px] rounded-full overflow-hidden">
               <Canvas dpr={[1, 2]} camera={{ position: [0, 0, 5.5], fov: 42 }}>
                 <ambientLight intensity={0.78} color="#fff7ee" />
                 <hemisphereLight intensity={0.46} color="#fff5e9" groundColor="#dfd0bf" />
@@ -164,7 +164,7 @@ export function Hero() {
                 <pointLight position={[0, -3.5, 4]} intensity={0.32} color="#ffefe1" />
 
                 <Float speed={0.9} rotationIntensity={0.08} floatIntensity={0.14}>
-                  <group scale={0.9} position={[0, 0, 0]}>
+                  <group scale={1.12} position={[0.02, 0, 0]}>
                     <Globe scrollProgress={globeProgress} />
                   </group>
                 </Float>

@@ -1,6 +1,9 @@
 <template>
   <div class="map-wrap">
     <div ref="mapContainer" class="map"></div>
+    <div v-if="loading" class="map-loading">
+      <div class="loading-pill">Loading sightings...</div>
+    </div>
 
     <div v-if="popup" class="map-popup" :style="{ left: popup.x + 'px', top: popup.y + 'px' }">
       <div class="popup-name">{{ popup.display_name }}</div>
@@ -23,6 +26,7 @@ import '@maptiler/sdk/dist/maptiler-sdk.css'
 import { useContinent } from '../composables/useContinent'
 
 const props = defineProps({
+  loading: { type: Boolean, default: false },
   sightings:     { type: Array,  default: () => [] },
   selectedClass: { type: String, default: null },
 })
@@ -235,6 +239,18 @@ watch(() => props.sightings, () => {
 <style scoped>
 .map-wrap { width: 100%; height: 100%; position: relative; }
 .map { width: 100%; height: 100%; }
+
+.map-loading {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  pointer-events: none; z-index: 5;
+}
+.loading-pill {
+  background: rgba(240,236,224,0.92);
+  border: 0.5px solid rgba(0,0,0,0.1);
+  border-radius: 20px; padding: 8px 16px;
+  font-size: 12px; color: #706050;
+}
 
 .map-popup {
   position: absolute;

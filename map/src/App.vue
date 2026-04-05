@@ -12,23 +12,22 @@
         >{{ c.name }}</span>
       </div>
       <div class="view-toggle">
-        <button class="vtab" :class="{ active: viewMode === 'hex' }" @click="viewMode = 'hex'">
+        <button class="vtab" :class="{ active: viewMode === 'hex' }" @click="setView('hex')">
           <svg width="13" height="13" viewBox="0 0 14 14"><polygon points="7,1 13,4.5 13,9.5 7,13 1,9.5 1,4.5" fill="none" stroke="currentColor" stroke-width="1.3"/></svg>
           Biodiversity
         </button>
-        <button class="vtab" :class="{ active: viewMode === 'dots' }" @click="viewMode = 'dots'">
+        <button class="vtab" :class="{ active: viewMode === 'dots' }" @click="setView('dots')">
           <svg width="13" height="13" viewBox="0 0 14 14"><circle cx="4" cy="4" r="2.5" fill="currentColor" opacity="0.6"/><circle cx="10" cy="9" r="2.5" fill="currentColor" opacity="0.6"/><circle cx="7" cy="6" r="2" fill="currentColor"/></svg>
           Sightings
         </button>
       </div>
       <div class="nav-right">
-        <input class="search" type="text" placeholder="Search species..." v-model="search" />
+        <span v-if="loadingMsg" class="loading-indicator">{{ loadingMsg }}</span>
       </div>
     </nav>
 
     <div class="body">
-      <!-- Left sidebar — class navigation -->
-      <aside class="sidebar">
+      <aside class="sidebar-wrap">
         <Sidebar
           :selected-class="selectedClass"
           :sighting-count="hexStats?.total_sightings || 0"
@@ -40,23 +39,26 @@
 
       <!-- Species slide-in panel -->
       <SpeciesPanel
+        v-if="selectedClass"
         :selected-class="selectedClass"
         :selected-species="selectedSpecies"
-        @close="onCloseSpecies"
+        @close="onClosePanel"
         @select-species="onSelectSpecies"
       />
 
-      <!-- Map -->
-      <main class="map-area" :style="{ left: speciesPanelOffset }">
+      <!-- Map area -->
+      <main class="map-area">
         <HexMap
           v-if="viewMode === 'hex'"
           :selected-class="selectedClass"
+          :selected-species-id="selectedSpecies?.id || null"
           @select-hex="onSelectHex"
         />
         <FlatMap
           v-else
           :sightings="sightings"
           :selected-class="selectedClass"
+          :loading="loadingSightings"
           @select-species="onSelectSpeciesFromMap"
         />
       </main>
@@ -66,6 +68,7 @@
         v-if="viewMode === 'hex'"
         :hex-index="selectedHex"
         @close="selectedHex = null"
+        @select-species="onSelectSpecies"
       />
       <DetailPanel
         v-if="selectedSpecies"
@@ -77,7 +80,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import { useApi } from './composables/useApi'
 import { useContinent, navigateToContinent } from './composables/useContinent'
 import Sidebar      from './components/Sidebar.vue'
@@ -96,10 +99,8 @@ const hexStats        = ref(null)
 const selectedClass   = ref(null)
 const selectedHex     = ref(null)
 const selectedSpecies = ref(null)
-const search          = ref('')
-
-// Offset map area when species panel is open
-const speciesPanelOffset = computed(() => selectedClass.value ? '440px' : '200px')
+const loadingSightings = ref(false)
+const loadingMsg      = ref('')
 
 const continents = [
   { name: 'N. America',  slug: 'northamerica' },
@@ -115,13 +116,21 @@ function switchContinent(slug) {
   navigateToContinent(slug)
 }
 
+function setView(mode) {
+  viewMode.value = mode
+  selectedHex.value = null
+  if (mode === 'dots') loadSightings()
+}
+
 function onFilterClass(cls) {
   selectedClass.value   = cls
   selectedSpecies.value = null
   selectedHex.value     = null
+  // In sightings mode, reload when class changes
+  if (viewMode.value === 'dots') loadSightings()
 }
 
-function onCloseSpecies() {
+function onClosePanel() {
   selectedClass.value   = null
   selectedSpecies.value = null
 }
@@ -129,6 +138,8 @@ function onCloseSpecies() {
 function onSelectSpecies(sp) {
   selectedSpecies.value = sp
   selectedHex.value     = null
+  // In sightings mode, load sightings for this specific species
+  if (viewMode.value === 'dots') loadSightingsForSpecies(sp)
 }
 
 function onSelectSpeciesFromMap(sp) {
@@ -142,9 +153,31 @@ function onSelectHex(h3Index) {
 }
 
 async function loadSightings() {
+  loadingSightings.value = true
+  loadingMsg.value = 'Loading sightings...'
   try {
-    sightings.value = await get('/api/sightings', { class: selectedClass.value, limit: 2000 })
-  } catch (e) { console.error(e) }
+    const params = { limit: 2000 }
+    if (selectedClass.value) params.class = selectedClass.value
+    sightings.value = await get('/api/sightings', params)
+  } catch (e) {
+    console.error('Failed to load sightings:', e)
+  } finally {
+    loadingSightings.value = false
+    loadingMsg.value = ''
+  }
+}
+
+async function loadSightingsForSpecies(sp) {
+  loadingSightings.value = true
+  loadingMsg.value = `Loading ${sp.display_name}...`
+  try {
+    sightings.value = await get('/api/sightings', { species_id: sp.id })
+  } catch (e) {
+    console.error('Failed to load species sightings:', e)
+  } finally {
+    loadingSightings.value = false
+    loadingMsg.value = ''
+  }
 }
 
 async function loadHexStats() {
@@ -152,61 +185,48 @@ async function loadHexStats() {
   catch (e) { console.error(e) }
 }
 
-watch(viewMode, (mode) => {
-  if (mode === 'dots' && sightings.value.length === 0) loadSightings()
-})
-
-watch(selectedClass, () => {
-  if (viewMode.value === 'dots') loadSightings()
-})
-
 onMounted(() => loadHexStats())
 </script>
 
 <style scoped>
-.app-shell { display: flex; flex-direction: column; height: 100vh; background: var(--color-bg); }
+.app-shell { display: flex; flex-direction: column; height: 100vh; }
 
 .topnav {
   display: flex; align-items: center; gap: 8px;
   padding: 0 14px; height: 48px;
-  background: var(--color-bg-sidebar);
-  border-bottom: 0.5px solid var(--color-border);
+  background: #e8e4d8;
+  border-bottom: 0.5px solid rgba(0,0,0,0.09);
   flex-shrink: 0; z-index: 20; position: relative;
 }
 
-.logo { font-family: var(--font-serif); font-size: 15px; color: var(--color-text-primary); flex-shrink: 0; }
-.logo b { color: var(--color-mammal); font-weight: normal; }
+.logo { font-family: Georgia, serif; font-size: 15px; color: #2a2418; flex-shrink: 0; }
+.logo b { color: #b05828; font-weight: normal; }
 
 .continent-tabs { display: flex; gap: 2px; background: rgba(0,0,0,0.06); border-radius: 5px; padding: 3px; }
 .ctab {
-  padding: 4px 8px; font-size: 11px; border-radius: 3px; cursor: pointer;
-  color: var(--color-text-muted); transition: background 0.15s, color 0.15s; white-space: nowrap;
+  padding: 4px 8px; font-size: 11px; border-radius: 3px;
+  cursor: pointer; color: #a09080;
+  transition: background 0.15s, color 0.15s; white-space: nowrap;
 }
-.ctab:hover { color: var(--color-text-primary); background: rgba(0,0,0,0.04); }
-.ctab.active { background: var(--color-bg-panel); color: var(--color-text-primary); }
+.ctab:hover { color: #2a2418; background: rgba(0,0,0,0.04); }
+.ctab.active { background: #f0ece0; color: #2a2418; }
 
 .view-toggle { display: flex; gap: 2px; background: rgba(0,0,0,0.06); border-radius: 5px; padding: 3px; }
 .vtab {
-  display: flex; align-items: center; gap: 5px; padding: 4px 9px; font-size: 11px;
-  border-radius: 3px; border: none; background: none; cursor: pointer;
-  color: var(--color-text-muted); font-family: var(--font-sans); transition: background 0.15s, color 0.15s;
+  display: flex; align-items: center; gap: 5px;
+  padding: 4px 9px; font-size: 11px; border-radius: 3px;
+  border: none; background: none; cursor: pointer;
+  color: #a09080; font-family: inherit;
+  transition: background 0.15s, color 0.15s;
 }
-.vtab.active { background: var(--color-bg-panel); color: var(--color-text-primary); }
+.vtab.active { background: #f0ece0; color: #2a2418; }
 
 .nav-right { margin-left: auto; }
-.search {
-  background: rgba(255,255,255,0.6); border: 0.5px solid var(--color-border);
-  border-radius: 5px; padding: 5px 10px; font-size: 11px;
-  color: var(--color-text-secondary); width: 160px; outline: none;
-}
+.loading-indicator { font-size: 11px; color: #a09080; font-style: italic; }
 
 .body { display: flex; flex: 1; overflow: hidden; position: relative; }
 
-.sidebar { width: 200px; flex-shrink: 0; z-index: 9; position: relative; }
+.sidebar-wrap { width: 200px; flex-shrink: 0; z-index: 9; position: relative; }
 
-.map-area {
-  position: absolute;
-  top: 0; bottom: 0; right: 0;
-  transition: left 0.28s cubic-bezier(0.22, 1, 0.36, 1);
-}
+.map-area { flex: 1; position: relative; overflow: hidden; }
 </style>

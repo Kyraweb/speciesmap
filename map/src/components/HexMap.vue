@@ -275,7 +275,6 @@ watch(() => props.selectedClass, async (cls) => {
   // Dim hexes that don't have this class, highlight those that do
   const countField = {
     'Mammalia':  'mammal_count',
-    'Aves':      'bird_count',
     'Reptilia':  'reptile_count',
     'Amphibia':  'amphibian_count',
   }[cls] || 'species_count'

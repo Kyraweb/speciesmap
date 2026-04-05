@@ -3,6 +3,8 @@ from app.database import get_connection
 
 router = APIRouter()
 
+TARGET_CLASSES = ['Mammalia', 'Reptilia', 'Amphibia']
+
 
 @router.get("/species")
 def get_species(
@@ -12,11 +14,6 @@ def get_species(
     search:      str = Query(None),
     limit:       int = Query(200),
 ):
-    """
-    Species list with sighting counts.
-    Supports class filter, IUCN filter, and text search.
-    Returns display_name (common if available, else cleaned scientific).
-    """
     conn = get_connection()
     cur  = conn.cursor()
 
@@ -38,8 +35,9 @@ def get_species(
         FROM species sp
         JOIN sightings si ON si.species_id = sp.id
         WHERE si.continent = %s
+        AND sp.class = ANY(%s)
     """
-    params = [continent]
+    params = [continent, TARGET_CLASSES]
 
     if class_:
         query += " AND sp.class = %s"
@@ -70,20 +68,31 @@ def get_species(
 
 @router.get("/species/counts")
 def get_species_counts(continent: str = Query("North America")):
-    """Species and sighting counts per class — for sidebar display."""
+    """
+    Fast class counts using hex_biodiversity summary table.
+    Avoids full sightings table scan.
+    """
     conn = get_connection()
     cur  = conn.cursor()
     cur.execute("""
         SELECT
-            sp.class,
-            COUNT(DISTINCT sp.id)  as species_count,
-            COUNT(si.id)           as sighting_count
-        FROM species sp
-        JOIN sightings si ON si.species_id = sp.id
-        WHERE si.continent = %s
-        GROUP BY sp.class
-        ORDER BY sighting_count DESC
-    """, [continent])
+            'Mammalia'  AS class,
+            SUM(mammal_count)    AS species_count,
+            SUM(CASE WHEN mammal_count > 0 THEN sighting_count * mammal_count::float / NULLIF(species_count,0) ELSE 0 END)::bigint AS sighting_count
+        FROM hex_biodiversity WHERE continent = %s
+        UNION ALL
+        SELECT
+            'Reptilia'  AS class,
+            SUM(reptile_count)   AS species_count,
+            SUM(CASE WHEN reptile_count > 0 THEN sighting_count * reptile_count::float / NULLIF(species_count,0) ELSE 0 END)::bigint AS sighting_count
+        FROM hex_biodiversity WHERE continent = %s
+        UNION ALL
+        SELECT
+            'Amphibia'  AS class,
+            SUM(amphibian_count) AS species_count,
+            SUM(CASE WHEN amphibian_count > 0 THEN sighting_count * amphibian_count::float / NULLIF(species_count,0) ELSE 0 END)::bigint AS sighting_count
+        FROM hex_biodiversity WHERE continent = %s
+    """, [continent, continent, continent])
     results = cur.fetchall()
     cur.close()
     conn.close()
@@ -95,18 +104,19 @@ def get_species_detail(
     species_id: str,
     continent:  str = Query("North America"),
 ):
-    """Full species detail — for the detail panel."""
     conn = get_connection()
     cur  = conn.cursor()
 
     cur.execute("""
         SELECT
-            sp.*,
+            sp.id, sp.scientific_name, sp.class, sp.order_name,
+            sp.family, sp.genus, sp.iucn_status,
             COALESCE(
                 NULLIF(TRIM(sp.common_name), ''),
                 SPLIT_PART(sp.scientific_name, ' ', 1) || ' ' ||
                 SPLIT_PART(sp.scientific_name, ' ', 2)
             ) AS display_name,
+            sp.common_name,
             COUNT(si.id) as sighting_count,
             MIN(si.observed_at) as first_seen,
             MAX(si.observed_at) as last_seen
@@ -117,39 +127,22 @@ def get_species_detail(
     """, [species_id, continent])
     detail = cur.fetchone()
 
-    # Temporal trend
     cur.execute("""
-        SELECT
-            EXTRACT(YEAR FROM observed_at)::INT as year,
-            COUNT(*) as count
+        SELECT EXTRACT(YEAR FROM observed_at)::INT as year, COUNT(*) as count
         FROM sightings
-        WHERE species_id = %s
-        AND continent = %s
-        AND observed_at IS NOT NULL
-        GROUP BY year
-        ORDER BY year
+        WHERE species_id = %s AND continent = %s AND observed_at IS NOT NULL
+        GROUP BY year ORDER BY year
     """, [species_id, continent])
     trend = cur.fetchall()
 
-    # Seasonal activity
     cur.execute("""
-        SELECT
-            EXTRACT(MONTH FROM observed_at)::INT as month,
-            COUNT(*) as count
+        SELECT EXTRACT(MONTH FROM observed_at)::INT as month, COUNT(*) as count
         FROM sightings
-        WHERE species_id = %s
-        AND continent = %s
-        AND observed_at IS NOT NULL
-        GROUP BY month
-        ORDER BY month
+        WHERE species_id = %s AND continent = %s AND observed_at IS NOT NULL
+        GROUP BY month ORDER BY month
     """, [species_id, continent])
     seasonal = cur.fetchall()
 
     cur.close()
     conn.close()
-
-    return {
-        "detail":   detail,
-        "trend":    trend,
-        "seasonal": seasonal,
-    }
+    return { "detail": detail, "trend": trend, "seasonal": seasonal }

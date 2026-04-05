@@ -89,7 +89,6 @@ let   searchTimer  = null
 
 const CLASS_LABELS = {
   Mammalia:  'Mammals',
-  Aves:      'Birds',
   Reptilia:  'Reptiles',
   Amphibia:  'Amphibians',
 }

@@ -107,7 +107,7 @@ function scoreColor(score) {
 const classBreakdown = computed(() => {
   if (!data.value?.summary) return []
   const s = data.value.summary
-  const total = (s.mammal_count || 0) + (s.bird_count || 0) + (s.reptile_count || 0) + (s.amphibian_count || 0)
+  const total = (s.mammal_count || 0) + (s.reptile_count || 0) + (s.amphibian_count || 0)
   if (!total) return []
   return [
     { name: 'Mammals',    count: s.mammal_count,    color: '#b05828', pct: Math.round((s.mammal_count / total) * 100) },

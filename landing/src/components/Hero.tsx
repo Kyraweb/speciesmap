@@ -35,6 +35,7 @@ export function Hero() {
   const containerRef = useRef<HTMLDivElement>(null);
   const isDesktop = useDesktopHero();
   const [globeProgress, setGlobeProgress] = useState(0);
+
   const { scrollYProgress } = useScroll({
     target: containerRef,
     offset: ['start start', 'end start'],
@@ -53,12 +54,12 @@ export function Hero() {
       className="relative min-h-screen flex flex-col items-center justify-center overflow-hidden px-6 md:px-8 pt-24 scroll-mt-24"
     >
       <div className="absolute inset-0 z-0 flex items-center justify-center opacity-40 mix-blend-multiply">
-        <div className="relative h-[34rem] w-[34rem] sm:h-[44rem] sm:w-[44rem] lg:h-[68rem] lg:w-[68rem] rounded-full bg-gradient-to-tr from-surface-container-high via-surface-variant to-primary-fixed blur-[120px] animate-pulse" />
-        <div className="absolute h-[22rem] w-[22rem] sm:h-[30rem] sm:w-[30rem] lg:h-[52rem] lg:w-[52rem] border-[0.5px] border-primary/10 rounded-full" />
-        <div className="absolute h-[15rem] w-[15rem] sm:h-[22rem] sm:w-[22rem] lg:h-[39rem] lg:w-[39rem] border-[0.5px] border-primary/16 rounded-full" />
+        <div className="relative h-[34rem] w-[34rem] sm:h-[44rem] sm:w-[44rem] lg:h-[64rem] lg:w-[64rem] rounded-full bg-gradient-to-tr from-surface-container-high via-surface-variant to-primary-fixed blur-[120px] animate-pulse" />
+        <div className="absolute h-[22rem] w-[22rem] sm:h-[30rem] sm:w-[30rem] lg:h-[48rem] lg:w-[48rem] border-[0.5px] border-primary/10 rounded-full" />
+        <div className="absolute h-[15rem] w-[15rem] sm:h-[22rem] sm:w-[22rem] lg:h-[36rem] lg:w-[36rem] border-[0.5px] border-primary/16 rounded-full" />
       </div>
 
-      <div className="relative z-10 w-full max-w-7xl grid grid-cols-1 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] items-center gap-10 lg:gap-10 xl:gap-14">
+      <div className="relative z-10 w-full max-w-7xl grid grid-cols-1 lg:grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)] items-center gap-10 lg:gap-8 xl:gap-12">
         <motion.div
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
@@ -75,7 +76,7 @@ export function Hero() {
               SpeciesMap / Earth intelligence
             </motion.span>
 
-            <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-[6.15rem] xl:text-[7.1rem] font-headline font-extrabold tracking-tight leading-[0.9] text-on-surface">
+            <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-[6rem] xl:text-[6.8rem] font-headline font-extrabold tracking-tight leading-[0.9] text-on-surface">
               See where life
               <br />
               <span className="text-primary/90 italic font-medium">holds, shifts, and fades.</span>
@@ -106,12 +107,14 @@ export function Hero() {
               <span className="font-bold uppercase tracking-widest text-[11px] sm:text-xs">Enter the map</span>
               <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
             </a>
+
             <a
               href="#methodology"
               className="bg-surface-container-highest/55 backdrop-blur-sm text-primary px-7 sm:px-9 py-4 font-bold uppercase tracking-widest text-[11px] sm:text-xs hover:bg-surface-variant transition-colors border border-outline-variant/20"
             >
               See how it works
             </a>
+
             <a
               href="/overview"
               className="bg-transparent text-on-surface px-1 py-4 text-[11px] font-bold uppercase tracking-[0.22em] hover:text-primary transition-colors"
@@ -142,42 +145,41 @@ export function Hero() {
         </motion.div>
 
         <motion.div
-          initial={{ opacity: 0, scale: 0.88 }}
+          initial={{ opacity: 0, scale: 0.92 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 1.4, ease: [0.22, 1, 0.36, 1] }}
-          className="relative order-1 lg:order-2 hidden lg:flex justify-center items-center h-[760px] xl:h-[840px] pointer-events-auto"
+          className="relative order-1 lg:order-2 hidden lg:flex justify-center items-center h-[700px] xl:h-[780px] pointer-events-auto"
         >
           <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
-            <div className="h-[34rem] w-[34rem] xl:h-[40rem] xl:w-[40rem] rounded-full bg-primary/7 blur-[120px]" />
+            <div className="h-[28rem] w-[28rem] xl:h-[34rem] xl:w-[34rem] rounded-full bg-primary/7 blur-[110px]" />
           </div>
 
-          <div className="relative w-full h-full translate-x-[4%] xl:translate-x-[7%]">
-            <Canvas dpr={[1, 2]} camera={{ position: [0, 0, 5.3], fov: 40 }}>
-              <ambientLight intensity={0.78} color="#fff7ee" />
-              <hemisphereLight intensity={0.46} color="#fff5e9" groundColor="#dfd0bf" />
-              <directionalLight position={[4.5, 2.5, 5]} intensity={1.95} color="#fff1df" />
-              <directionalLight position={[-4, -1.75, 3.5]} intensity={0.72} color="#f0dcc9" />
-              <pointLight position={[0, -3.5, 4]} intensity={0.32} color="#ffefe1" />
+          <div className="relative flex h-full w-full items-center justify-center translate-x-[2%] xl:translate-x-[4%]">
+            <div className="relative h-[520px] w-[520px] xl:h-[620px] xl:w-[620px] rounded-full overflow-hidden">
+              <Canvas dpr={[1, 2]} camera={{ position: [0, 0, 4.15], fov: 34 }}>
+                <ambientLight intensity={0.78} color="#fff7ee" />
+                <hemisphereLight intensity={0.46} color="#fff5e9" groundColor="#dfd0bf" />
+                <directionalLight position={[4.5, 2.5, 5]} intensity={1.95} color="#fff1df" />
+                <directionalLight position={[-4, -1.75, 3.5]} intensity={0.72} color="#f0dcc9" />
+                <pointLight position={[0, -3.5, 4]} intensity={0.32} color="#ffefe1" />
 
-              <Float
-                speed={0.9}
-                rotationIntensity={0.08}
-                floatIntensity={0.16}
-              >
-                <group scale={1.2} position={[0.2, 0, 0]}>
-                  <Globe scrollProgress={globeProgress} />
-                </group>
-              </Float>
+                <Float speed={0.9} rotationIntensity={0.08} floatIntensity={0.14}>
+                  <group scale={1.7} position={[0.1, -0.02, 0]}>
+                    <Globe scrollProgress={globeProgress} />
+                  </group>
+                </Float>
 
-              <OrbitControls
-                enableZoom={false}
-                enablePan={false}
-                autoRotate
-                autoRotateSpeed={0.12}
-                enabled={true}
-              />
-              <Environment preset="sunset" />
-            </Canvas>
+                <OrbitControls
+                  enableZoom={false}
+                  enablePan={false}
+                  autoRotate
+                  autoRotateSpeed={0.12}
+                  enabled={true}
+                />
+
+                <Environment preset="sunset" />
+              </Canvas>
+            </div>
           </div>
         </motion.div>
       </div>

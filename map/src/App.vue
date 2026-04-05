@@ -63,7 +63,7 @@
 
       <!-- Right detail panels -->
       <HexDetail
-        v-if="viewMode === 'hex' && selectedHex"
+        v-if="viewMode === 'hex'"
         :hex-index="selectedHex"
         @close="selectedHex = null"
       />

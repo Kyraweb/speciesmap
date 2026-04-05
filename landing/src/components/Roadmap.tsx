@@ -29,7 +29,7 @@ const phases = [
     status: 'Planned',
     title: 'Deeper ecological context',
     description:
-      'From full species pages to density layers and absence mapping, the platform will become much more explanatory — showing not just where a species appears, but how concentrated it is and where expected presence no longer aligns with real observation.',
+      'From full species pages to density layers and absence mapping, the platform will become much more explanatory, showing not just where a species appears, but how concentrated it is and where expected presence no longer aligns with real observation.',
     highlights: ['Species detail page', 'Heatmap toggle', 'Absence mapping'],
     isCurrent: false,
   },
@@ -63,7 +63,7 @@ export function Roadmap() {
       <div className="max-w-screen-xl mx-auto px-8">
         <div className="mb-28 space-y-6 max-w-4xl">
           <div className="flex items-center gap-3">
-            <span className="w-12 h-px bg-primary/30"></span>
+            <span className="w-12 h-px bg-primary/30" />
             <span className="text-[10px] font-bold uppercase tracking-[0.4em] text-primary">Product evolution</span>
           </div>
 
@@ -75,12 +75,12 @@ export function Roadmap() {
           <p className="text-xl text-on-surface-variant font-body leading-relaxed max-w-2xl opacity-85">
             Work began in 2026. The roadmap is not a pile of features; it is a sequence. First make
             SpeciesMap easier to navigate, then make change visible through time, then deepen ecological
-            understanding, and finally expand the platform’s reach.
+            understanding, and finally expand the platform&apos;s reach.
           </p>
         </div>
 
         <div className="relative">
-          <div className="absolute left-8 md:left-1/2 top-0 bottom-0 w-[2px] bg-outline-variant/10 -translate-x-1/2 hidden md:block"></div>
+          <div className="absolute left-8 md:left-1/2 top-0 bottom-0 w-[2px] bg-outline-variant/10 -translate-x-1/2 hidden md:block" />
           <motion.div
             style={{ scaleY }}
             className="absolute left-8 md:left-1/2 top-0 bottom-0 w-[2px] bg-gradient-to-b from-primary via-primary to-primary/20 origin-top -translate-x-1/2 hidden md:block z-0"
@@ -149,7 +149,7 @@ export function Roadmap() {
                   )}
                 </div>
 
-                <div className="flex-1 hidden md:block"></div>
+                <div className="flex-1 hidden md:block" />
               </motion.div>
             ))}
           </div>
@@ -165,7 +165,7 @@ export function Roadmap() {
               </div>
               <div>
                 <p className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/40 mb-2">Current trajectory</p>
-                <p className="text-sm font-headline font-bold text-on-surface">Navigation → Time → Context</p>
+                <p className="text-sm font-headline font-bold text-on-surface">Navigation to time to context</p>
               </div>
               <div>
                 <p className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/40 mb-2">Expansion path</p>
@@ -176,7 +176,7 @@ export function Roadmap() {
 
           <div className="bg-surface border border-outline-variant/12 p-8 lg:p-10 editorial-shadow space-y-6">
             <div className="flex items-center gap-3">
-              <span className="w-10 h-px bg-primary/25"></span>
+              <span className="w-10 h-px bg-primary/25" />
               <span className="text-[10px] font-bold uppercase tracking-[0.35em] text-primary">The bigger picture</span>
             </div>
 

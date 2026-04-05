@@ -1,18 +1,32 @@
-import { Menu } from 'lucide-react';
 import { cn } from '@/src/lib/utils';
 import { useEffect, useState } from 'react';
 import { motion, useScroll } from 'motion/react';
 
-const navItems = [
-  { label: 'Registry', href: '#registry' },
-  { label: 'Methodology', href: '#methodology' },
-  { label: 'Roadmap', href: '#roadmap' },
-  { label: 'Overview', href: '/overview' },
-];
+type NavbarPage = 'home' | 'overview';
 
-export function Navbar() {
+const navItemsByPage: Record<NavbarPage, { label: string; href: string }[]> = {
+  home: [
+    { label: 'Registry', href: '#registry' },
+    { label: 'Methodology', href: '#methodology' },
+    { label: 'Roadmap', href: '#roadmap' },
+    { label: 'Overview', href: '/overview' },
+  ],
+  overview: [
+    { label: 'Platform', href: '#platform' },
+    { label: 'Why It Matters', href: '#why-speciesmap' },
+    { label: 'Current State', href: '#current-state' },
+    { label: 'Roadmap', href: '#roadmap' },
+  ],
+};
+
+export function Navbar({ page = 'home' }: { page?: NavbarPage }) {
   const [isScrolled, setIsScrolled] = useState(false);
   const { scrollYProgress } = useScroll();
+  const navItems = navItemsByPage[page];
+  const logoHref = page === 'overview' ? '#platform' : '#hero';
+  const eyebrow = page === 'overview' ? 'Platform overview' : 'Early platform preview';
+  const ctaHref = page === 'overview' ? '/#registry' : '#registry';
+  const ctaLabel = page === 'overview' ? 'Open the homepage' : 'Enter SpeciesMap';
 
   useEffect(() => {
     const handleScroll = () => setIsScrolled(window.scrollY > 36);
@@ -31,7 +45,7 @@ export function Navbar() {
     >
       <nav className="flex justify-between items-center px-6 md:px-10 lg:px-12 w-full max-w-screen-2xl mx-auto gap-6">
         <div className="flex items-center gap-8 lg:gap-12 min-w-0">
-          <a href="#hero" className="min-w-0 block">
+          <a href={logoHref} className="min-w-0 block">
             <div className="text-2xl font-bold font-headline text-on-surface tracking-tighter leading-none">
               SpeciesMap
             </div>
@@ -55,19 +69,15 @@ export function Navbar() {
 
         <div className="flex items-center gap-4 md:gap-6 lg:gap-8 shrink-0">
           <div className="hidden md:block text-[10px] font-bold uppercase tracking-[0.26em] text-on-surface-variant/55">
-            Early platform preview
+            {eyebrow}
           </div>
 
           <a
-            href="#registry"
+            href={ctaHref}
             className="bg-primary text-on-primary px-5 md:px-7 lg:px-8 py-3 text-[10px] font-bold uppercase tracking-[0.28em] hover:bg-primary-container transition-all editorial-shadow"
           >
-            Enter SpeciesMap
+            {ctaLabel}
           </a>
-
-          <button className="lg:hidden text-on-surface" aria-label="Open navigation menu">
-            <Menu className="w-6 h-6" />
-          </button>
         </div>
       </nav>
 

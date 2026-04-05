@@ -27,17 +27,27 @@
     </nav>
 
     <div class="body">
+      <!-- Left sidebar — class navigation -->
       <aside class="sidebar">
         <Sidebar
           :selected-class="selectedClass"
-          :sighting-count="hexStats?.total_sightings || sightings.length"
-          :species-count="hexStats?.total_species_records || speciesList.length"
+          :sighting-count="hexStats?.total_sightings || 0"
+          :species-count="hexStats?.total_species_records || 0"
           :view-mode="viewMode"
-          @filter-class="selectedClass = $event"
+          @filter-class="onFilterClass"
         />
       </aside>
 
-      <main class="map-area">
+      <!-- Species slide-in panel -->
+      <SpeciesPanel
+        :selected-class="selectedClass"
+        :selected-species="selectedSpecies"
+        @close="onCloseSpecies"
+        @select-species="onSelectSpecies"
+      />
+
+      <!-- Map -->
+      <main class="map-area" :style="{ left: speciesPanelOffset }">
         <HexMap
           v-if="viewMode === 'hex'"
           :selected-class="selectedClass"
@@ -47,17 +57,18 @@
           v-else
           :sightings="sightings"
           :selected-class="selectedClass"
-          @select-species="onSelectSpecies"
+          @select-species="onSelectSpeciesFromMap"
         />
       </main>
 
+      <!-- Right detail panels -->
       <HexDetail
-        v-if="viewMode === 'hex'"
+        v-if="viewMode === 'hex' && selectedHex"
         :hex-index="selectedHex"
         @close="selectedHex = null"
       />
       <DetailPanel
-        v-else
+        v-if="selectedSpecies"
         :species="selectedSpecies"
         @close="selectedSpecies = null"
       />
@@ -66,34 +77,37 @@
 </template>
 
 <script setup>
-import { ref, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useApi } from './composables/useApi'
 import { useContinent, navigateToContinent } from './composables/useContinent'
-import Sidebar     from './components/Sidebar.vue'
-import DetailPanel from './components/DetailPanel.vue'
-import FlatMap     from './components/FlatMap.vue'
-import HexMap      from './components/HexMap.vue'
-import HexDetail   from './components/HexDetail.vue'
+import Sidebar      from './components/Sidebar.vue'
+import SpeciesPanel from './components/SpeciesPanel.vue'
+import DetailPanel  from './components/DetailPanel.vue'
+import FlatMap      from './components/FlatMap.vue'
+import HexMap       from './components/HexMap.vue'
+import HexDetail    from './components/HexDetail.vue'
 
 const { get } = useApi()
 const { slug: currentSlug } = useContinent()
 
-const viewMode      = ref('hex')
-const sightings     = ref([])
-const speciesList   = ref([])
-const hexStats      = ref(null)
+const viewMode        = ref('hex')
+const sightings       = ref([])
+const hexStats        = ref(null)
 const selectedClass   = ref(null)
 const selectedHex     = ref(null)
 const selectedSpecies = ref(null)
 const search          = ref('')
 
+// Offset map area when species panel is open
+const speciesPanelOffset = computed(() => selectedClass.value ? '440px' : '200px')
+
 const continents = [
-  { name: 'N. America',   slug: 'northamerica' },
-  { name: 'S. America',   slug: 'southamerica' },
-  { name: 'Europe',       slug: 'europe' },
-  { name: 'Africa',       slug: 'africa' },
-  { name: 'Asia',         slug: 'asia' },
-  { name: 'Oceania',      slug: 'oceania' },
+  { name: 'N. America',  slug: 'northamerica' },
+  { name: 'S. America',  slug: 'southamerica' },
+  { name: 'Europe',      slug: 'europe' },
+  { name: 'Africa',      slug: 'africa' },
+  { name: 'Asia',        slug: 'asia' },
+  { name: 'Oceania',     slug: 'oceania' },
 ]
 
 function switchContinent(slug) {
@@ -101,43 +115,52 @@ function switchContinent(slug) {
   navigateToContinent(slug)
 }
 
+function onFilterClass(cls) {
+  selectedClass.value   = cls
+  selectedSpecies.value = null
+  selectedHex.value     = null
+}
+
+function onCloseSpecies() {
+  selectedClass.value   = null
+  selectedSpecies.value = null
+}
+
+function onSelectSpecies(sp) {
+  selectedSpecies.value = sp
+  selectedHex.value     = null
+}
+
+function onSelectSpeciesFromMap(sp) {
+  selectedSpecies.value = sp
+  selectedHex.value     = null
+}
+
 function onSelectHex(h3Index) {
   selectedHex.value     = h3Index
   selectedSpecies.value = null
 }
 
-function onSelectSpecies(sighting) {
-  selectedSpecies.value = sighting
-  selectedHex.value     = null
-}
-
 async function loadSightings() {
   try {
     sightings.value = await get('/api/sightings', { class: selectedClass.value, limit: 2000 })
-  } catch (e) { console.error('Failed to load sightings:', e) }
-}
-
-async function loadSpecies() {
-  try {
-    speciesList.value = await get('/api/species', { class: selectedClass.value })
-  } catch (e) { console.error('Failed to load species:', e) }
+  } catch (e) { console.error(e) }
 }
 
 async function loadHexStats() {
-  try {
-    hexStats.value = await get('/api/hex/stats/overview')
-  } catch (e) { console.error('Failed to load hex stats:', e) }
+  try { hexStats.value = await get('/api/hex/stats/overview') }
+  catch (e) { console.error(e) }
 }
 
-watch(selectedClass, () => {
-  if (viewMode.value === 'dots') { loadSightings(); loadSpecies() }
-})
-
 watch(viewMode, (mode) => {
-  if (mode === 'dots' && sightings.value.length === 0) { loadSightings(); loadSpecies() }
+  if (mode === 'dots' && sightings.value.length === 0) loadSightings()
 })
 
-onMounted(() => { loadHexStats() })
+watch(selectedClass, () => {
+  if (viewMode.value === 'dots') loadSightings()
+})
+
+onMounted(() => loadHexStats())
 </script>
 
 <style scoped>
@@ -148,30 +171,25 @@ onMounted(() => { loadHexStats() })
   padding: 0 14px; height: 48px;
   background: var(--color-bg-sidebar);
   border-bottom: 0.5px solid var(--color-border);
-  flex-shrink: 0;
+  flex-shrink: 0; z-index: 20; position: relative;
 }
 
 .logo { font-family: var(--font-serif); font-size: 15px; color: var(--color-text-primary); flex-shrink: 0; }
 .logo b { color: var(--color-mammal); font-weight: normal; }
 
 .continent-tabs { display: flex; gap: 2px; background: rgba(0,0,0,0.06); border-radius: 5px; padding: 3px; }
-
 .ctab {
-  padding: 4px 8px; font-size: 11px; border-radius: 3px;
-  cursor: pointer; color: var(--color-text-muted);
-  transition: background 0.15s, color 0.15s; white-space: nowrap;
+  padding: 4px 8px; font-size: 11px; border-radius: 3px; cursor: pointer;
+  color: var(--color-text-muted); transition: background 0.15s, color 0.15s; white-space: nowrap;
 }
 .ctab:hover { color: var(--color-text-primary); background: rgba(0,0,0,0.04); }
 .ctab.active { background: var(--color-bg-panel); color: var(--color-text-primary); }
 
 .view-toggle { display: flex; gap: 2px; background: rgba(0,0,0,0.06); border-radius: 5px; padding: 3px; }
-
 .vtab {
-  display: flex; align-items: center; gap: 5px;
-  padding: 4px 9px; font-size: 11px; border-radius: 3px;
-  border: none; background: none; cursor: pointer;
-  color: var(--color-text-muted); font-family: var(--font-sans);
-  transition: background 0.15s, color 0.15s;
+  display: flex; align-items: center; gap: 5px; padding: 4px 9px; font-size: 11px;
+  border-radius: 3px; border: none; background: none; cursor: pointer;
+  color: var(--color-text-muted); font-family: var(--font-sans); transition: background 0.15s, color 0.15s;
 }
 .vtab.active { background: var(--color-bg-panel); color: var(--color-text-primary); }
 
@@ -183,6 +201,12 @@ onMounted(() => { loadHexStats() })
 }
 
 .body { display: flex; flex: 1; overflow: hidden; position: relative; }
-.sidebar { width: 200px; flex-shrink: 0; }
-.map-area { flex: 1; position: relative; }
+
+.sidebar { width: 200px; flex-shrink: 0; z-index: 9; position: relative; }
+
+.map-area {
+  position: absolute;
+  top: 0; bottom: 0; right: 0;
+  transition: left 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+}
 </style>

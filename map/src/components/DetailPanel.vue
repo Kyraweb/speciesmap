@@ -173,7 +173,10 @@ watch(() => props.species, async (sp) => {
   // Cancel any in-flight request
   if (abortController) abortController.abort()
 
-  if (!sp?.id) {
+  // species_id can come from sighting properties (uses species_id field)
+  // or from species list (uses id field)
+  const speciesId = sp?.id || sp?.species_id
+  if (!sp || !speciesId) {
     detail.value  = null
     rawData.value = null
     return
@@ -185,8 +188,8 @@ watch(() => props.species, async (sp) => {
   rawData.value   = null
 
   try {
-    const resp    = await get(`/api/species/${sp.id}`)
-    // Only update if this request wasn't aborted (still the current species)
+    // Convert to string — MapLibre can serialize UUIDs oddly from properties
+    const resp    = await get(`/api/species/${String(speciesId)}`)
     rawData.value = resp
     detail.value  = resp.detail
   } catch (e) {

@@ -9,7 +9,7 @@ def get_sightings(
     continent:  str = Query("North America"),
     class_:     str = Query(None, alias="class"),
     species_id: str = Query(None),
-    limit:      int = Query(5000),
+    limit:      int = Query(10000),
 ):
     """
     Fast sightings using DISTINCT ON h3_index.

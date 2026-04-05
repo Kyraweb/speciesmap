@@ -1,5 +1,7 @@
 <template>
   <div class="sidebar">
+
+    <!-- Stats header -->
     <div class="sidebar-head">
       <div class="stat-row">
         <div class="stat">
@@ -13,30 +15,71 @@
       </div>
     </div>
 
-    <div class="section-label">Classes</div>
-    <div class="class-list">
-      <div
-        v-for="cls in classes"
-        :key="cls.key"
-        class="class-item"
-        :class="{ active: selectedClass === cls.key }"
-        @click="selectClass(cls.key)"
-      >
-        <span class="cls-dot" :style="{ background: cls.color }"></span>
-        <div class="cls-info">
-          <div class="cls-name">{{ cls.label }}</div>
-          <div class="cls-count">
+    <!-- ── BIODIVERSITY MODE ── -->
+    <template v-if="viewMode === 'hex'">
+      <div class="section-label">Wildlife classes</div>
+      <div class="class-list">
+        <div
+          v-for="cls in classes"
+          :key="cls.key"
+          class="class-stat"
+          :class="{ active: selectedClass === cls.key }"
+          @click="toggleClass(cls.key)"
+        >
+          <div class="cs-left">
+            <span class="cls-dot" :style="{ background: cls.color }"></span>
+            <div class="cs-info">
+              <div class="cs-name">{{ cls.label }}</div>
+              <div class="cs-sub">
+                <span v-if="classCounts[cls.key]">
+                  {{ fmt(classCounts[cls.key].species_count) }} sp.
+                </span>
+                <span v-else class="pulse">···</span>
+              </div>
+            </div>
+          </div>
+          <div class="cs-count">
             <span v-if="classCounts[cls.key]">{{ fmt(classCounts[cls.key].sighting_count) }}</span>
-            <span v-else class="loading-pulse">···</span>
           </div>
         </div>
-        <svg class="cls-arrow" width="12" height="12" viewBox="0 0 12 12">
-          <path d="M4 2l4 4-4 4" stroke="currentColor" stroke-width="1.2" fill="none" stroke-linecap="round"/>
-        </svg>
       </div>
-    </div>
 
-    <div class="section-label" style="margin-top: 14px;">Conservation status</div>
+      <div class="hex-hint">
+        <svg width="12" height="12" viewBox="0 0 14 14">
+          <polygon points="7,1 13,4.5 13,9.5 7,13 1,9.5 1,4.5" fill="none" stroke="currentColor" stroke-width="1.2"/>
+        </svg>
+        Click a hex to explore species
+      </div>
+    </template>
+
+    <!-- ── SIGHTINGS MODE ── -->
+    <template v-else>
+      <div class="section-label">Filter by class</div>
+      <div class="class-list">
+        <div
+          v-for="cls in classes"
+          :key="cls.key"
+          class="class-item"
+          :class="{ active: selectedClass === cls.key }"
+          @click="toggleClass(cls.key)"
+        >
+          <span class="cls-dot" :style="{ background: cls.color }"></span>
+          <div class="cls-info">
+            <div class="cls-name">{{ cls.label }}</div>
+            <div class="cls-count">
+              <span v-if="classCounts[cls.key]">{{ fmt(classCounts[cls.key].sighting_count) }}</span>
+              <span v-else class="pulse">···</span>
+            </div>
+          </div>
+          <svg class="cls-arrow" width="12" height="12" viewBox="0 0 12 12">
+            <path d="M4 2l4 4-4 4" stroke="currentColor" stroke-width="1.2" fill="none" stroke-linecap="round"/>
+          </svg>
+        </div>
+      </div>
+    </template>
+
+    <!-- Conservation status legend — both modes -->
+    <div class="section-label" style="margin-top:12px">Conservation status</div>
     <div class="iucn-list">
       <div v-for="s in iucnStatuses" :key="s.code" class="iucn-row">
         <span class="iucn-badge" :style="{ background: s.bg, color: s.color }">{{ s.code }}</span>
@@ -67,11 +110,10 @@ const emit = defineEmits(['filter-class'])
 const { get } = useApi()
 const classCounts = ref({})
 
-// Aves removed — speciesmap covers land animals only
 const classes = [
-  { key: 'Mammalia',  label: 'Mammals',    color: '#b05828' },
-  { key: 'Reptilia',  label: 'Reptiles',   color: '#6a9848' },
-  { key: 'Amphibia',  label: 'Amphibians', color: '#8858b0' },
+  { key: 'Mammalia', label: 'Mammals',    color: '#b05828' },
+  { key: 'Reptilia', label: 'Reptiles',   color: '#6a9848' },
+  { key: 'Amphibia', label: 'Amphibians', color: '#8858b0' },
 ]
 
 const iucnStatuses = [
@@ -85,11 +127,11 @@ const iucnStatuses = [
 function fmt(n) {
   if (!n) return '0'
   if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M'
-  if (n >= 1000) return (n / 1000).toFixed(0) + 'k'
+  if (n >= 1000)    return (n / 1000).toFixed(0) + 'k'
   return n.toLocaleString()
 }
 
-function selectClass(key) {
+function toggleClass(key) {
   emit('filter-class', props.selectedClass === key ? null : key)
 }
 
@@ -114,35 +156,83 @@ onMounted(() => loadCounts())
   display: flex; flex-direction: column; overflow: hidden;
 }
 
-.sidebar-head { padding: 12px 12px 10px; border-bottom: 0.5px solid rgba(0,0,0,0.08); flex-shrink: 0; }
+.sidebar-head {
+  padding: 12px 12px 10px;
+  border-bottom: 0.5px solid rgba(0,0,0,0.08);
+  flex-shrink: 0;
+}
+
 .stat-row { display: flex; gap: 8px; }
-.stat { flex: 1; background: #f0ece0; border-radius: 6px; padding: 8px 10px; text-align: center; }
-.stat-num { font-size: 16px; font-family: Georgia, serif; color: #6a9848; text-shadow: 0 0 8px rgba(106,152,72,0.3); line-height: 1; }
+.stat {
+  flex: 1; background: #f0ece0; border-radius: 6px;
+  padding: 8px 10px; text-align: center;
+}
+.stat-num {
+  font-size: 16px; font-family: Georgia, serif; color: #6a9848;
+  text-shadow: 0 0 8px rgba(106,152,72,0.3); line-height: 1;
+}
 .stat-lbl { font-size: 9px; color: #a09080; margin-top: 2px; }
 
-.section-label { font-size: 9px; letter-spacing: 0.8px; text-transform: uppercase; color: #b0a090; padding: 10px 12px 5px; flex-shrink: 0; }
+.section-label {
+  font-size: 9px; letter-spacing: 0.8px; text-transform: uppercase;
+  color: #b0a090; padding: 10px 12px 5px; flex-shrink: 0;
+}
 
+/* ── Biodiversity class stats (no arrow, no hover navigation) ── */
 .class-list { padding: 0 8px; flex-shrink: 0; }
+
+.class-stat {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 8px; border-radius: 6px;
+  cursor: pointer; transition: background 0.15s;
+}
+.class-stat:hover { background: rgba(0,0,0,0.04); }
+.class-stat.active { background: #f0ece0; }
+
+.cs-left  { display: flex; align-items: center; gap: 8px; }
+.cs-info  { display: flex; flex-direction: column; gap: 1px; }
+.cs-name  { font-size: 12px; color: #2a2418; }
+.cs-sub   { font-size: 10px; color: #a09080; }
+.cs-count { font-size: 11px; color: #6a9848; font-family: Georgia, serif; }
+
+/* ── Sightings class items (with arrow) ── */
 .class-item {
   display: flex; align-items: center; gap: 8px;
-  padding: 9px 8px; border-radius: 6px; cursor: pointer; transition: background 0.15s;
+  padding: 9px 8px; border-radius: 6px;
+  cursor: pointer; transition: background 0.15s;
 }
 .class-item:hover { background: rgba(0,0,0,0.05); }
 .class-item.active { background: #f0ece0; }
-.cls-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+
+.cls-dot  { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
 .cls-info { flex: 1; min-width: 0; }
-.cls-name { font-size: 12px; color: #2a2418; }
+.cls-name  { font-size: 12px; color: #2a2418; }
 .cls-count { font-size: 10px; color: #a09080; margin-top: 1px; }
-.loading-pulse { opacity: 0.5; }
 .cls-arrow { color: #c0b0a0; flex-shrink: 0; }
 .class-item.active .cls-arrow { color: #b05828; }
 
+.pulse { opacity: 0.5; }
+
+.hex-hint {
+  display: flex; align-items: center; gap: 5px;
+  padding: 8px 12px; font-size: 10px; color: #b0a090;
+  border-top: 0.5px solid rgba(0,0,0,0.06); margin-top: 4px;
+  flex-shrink: 0;
+}
+
+/* IUCN */
 .iucn-list { padding: 0 12px; display: flex; flex-direction: column; gap: 4px; flex-shrink: 0; }
-.iucn-row { display: flex; align-items: center; gap: 7px; }
-.iucn-badge { font-size: 9px; padding: 2px 5px; border-radius: 3px; font-weight: 500; flex-shrink: 0; }
+.iucn-row  { display: flex; align-items: center; gap: 7px; }
+.iucn-badge {
+  font-size: 9px; padding: 2px 5px; border-radius: 3px;
+  font-weight: 500; flex-shrink: 0;
+}
 .iucn-label { font-size: 10px; color: #706050; }
 
-.sidebar-footer { margin-top: auto; padding: 10px 12px 12px; border-top: 0.5px solid rgba(0,0,0,0.08); flex-shrink: 0; }
-.footer-label { font-size: 9px; letter-spacing: 0.8px; text-transform: uppercase; color: #b0a090; margin-bottom: 4px; }
+.sidebar-footer {
+  margin-top: auto; padding: 10px 12px 12px;
+  border-top: 0.5px solid rgba(0,0,0,0.08); flex-shrink: 0;
+}
+.footer-label  { font-size: 9px; letter-spacing: 0.8px; text-transform: uppercase; color: #b0a090; margin-bottom: 4px; }
 .footer-source { font-size: 10px; color: #a09080; }
 </style>

@@ -3,6 +3,10 @@ import { useFrame } from '@react-three/fiber';
 import { Sphere, useTexture, Instance, Instances } from '@react-three/drei';
 import * as THREE from 'three';
 
+const GLOBE_RADIUS = 1.45;
+const ATMOSPHERE_RADIUS = 1.58;
+const POINTS_RADIUS = 1.47;
+
 // Atmosphere Shader
 const AtmosphereShader = {
   uniforms: {
@@ -61,29 +65,29 @@ export function Globe({ scrollProgress = 0 }: { scrollProgress?: number }) {
     for (let i = 0; i < pointCount; i++) {
       const phi = Math.acos(-1 + (2 * i) / pointCount);
       const theta = Math.sqrt(pointCount * Math.PI) * phi;
-      
+
       const x = Math.cos(theta) * Math.sin(phi);
       const y = Math.sin(theta) * Math.sin(phi);
       const z = Math.cos(phi);
-      
+
       const pos = new THREE.Vector3(x, y, z);
-      
+
       let inCluster = false;
       let clusterIntensity = 0;
       for (const cluster of clusters) {
         const dist = pos.distanceTo(cluster.pos);
         if (dist < cluster.radius) {
           inCluster = true;
-          clusterIntensity = 1 - (dist / cluster.radius);
+          clusterIntensity = 1 - dist / cluster.radius;
           break;
         }
       }
 
-      p.push({ 
-        pos: pos.clone().multiplyScalar(2.02),
-        scale: (inCluster ? 0.012 : 0.006) + Math.random() * 0.005,
+      p.push({
+        pos: pos.clone().multiplyScalar(POINTS_RADIUS),
+        scale: (inCluster ? 0.009 : 0.0045) + Math.random() * 0.0035,
         active: inCluster,
-        intensity: clusterIntensity
+        intensity: clusterIntensity,
       });
     }
     return p;
@@ -92,17 +96,17 @@ export function Globe({ scrollProgress = 0 }: { scrollProgress?: number }) {
   useFrame((state) => {
     const time = state.clock.getElapsedTime();
     if (globeRef.current) {
-      globeRef.current.rotation.y = time * 0.03 + (scrollProgress * 0.5);
+      globeRef.current.rotation.y = time * 0.03 + scrollProgress * 0.5;
     }
   });
 
   return (
     <group ref={globeRef}>
-      <Sphere args={[2, 64, 64]}>
+      <Sphere args={[GLOBE_RADIUS, 64, 64]}>
         <meshStandardMaterial
           map={colorMap}
           bumpMap={bumpMap}
-          bumpScale={0.03}
+          bumpScale={0.02}
           color="#f6f0e8"
           metalness={0.03}
           roughness={0.78}
@@ -118,7 +122,7 @@ export function Globe({ scrollProgress = 0 }: { scrollProgress?: number }) {
         ))}
       </Instances>
 
-      <Sphere args={[2.2, 64, 64]}>
+      <Sphere args={[ATMOSPHERE_RADIUS, 64, 64]}>
         <shaderMaterial
           attach="material"
           {...AtmosphereShader}
@@ -132,29 +136,35 @@ export function Globe({ scrollProgress = 0 }: { scrollProgress?: number }) {
   );
 }
 
-function PointInstance({ pos, scale, active, intensity, scrollProgress }: { 
-  pos: THREE.Vector3, 
-  scale: number, 
-  active: boolean, 
-  intensity: number,
-  scrollProgress: number 
+function PointInstance({
+  pos,
+  scale,
+  active,
+  intensity,
+  scrollProgress,
+}: {
+  pos: THREE.Vector3;
+  scale: number;
+  active: boolean;
+  intensity: number;
+  scrollProgress: number;
 }) {
   const ref = useRef<THREE.Group>(null);
-  
+
   useFrame((state) => {
     if (ref.current) {
       const t = state.clock.getElapsedTime();
 
       let s = scale;
       if (active) {
-        s *= (1 + Math.sin(t * 1.5 + pos.x * 5) * 0.2 * intensity);
+        s *= 1 + Math.sin(t * 1.5 + pos.x * 5) * 0.2 * intensity;
       }
 
       const scrollEffect = Math.max(0, scrollProgress * 1.5);
       if (active) {
-        s *= (1 + scrollEffect * 0.5);
+        s *= 1 + scrollEffect * 0.5;
       } else {
-        s *= (1 + scrollEffect * 0.1);
+        s *= 1 + scrollEffect * 0.1;
       }
 
       ref.current.scale.setScalar(s);
@@ -163,10 +173,7 @@ function PointInstance({ pos, scale, active, intensity, scrollProgress }: {
 
   return (
     <group ref={ref} position={pos} scale={scale}>
-      <Instance
-        color={active ? '#f8dfcf' : '#be7a4e'}
-      />
+      <Instance color={active ? '#f8dfcf' : '#be7a4e'} />
     </group>
   );
 }
-

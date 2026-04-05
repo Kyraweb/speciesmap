@@ -1,7 +1,6 @@
 <template>
   <transition name="slide">
     <div class="detail-panel" v-if="species">
-
       <div class="dp-header">
         <button class="back-btn" @click="$emit('close')">
           <svg width="14" height="14" viewBox="0 0 14 14"><path d="M9 2L5 7l4 5" stroke="currentColor" stroke-width="1.3" fill="none" stroke-linecap="round"/></svg>
@@ -10,59 +9,59 @@
         <button class="xbtn" @click="$emit('close')">✕</button>
       </div>
 
-      <div v-if="loading" class="dp-loading">Loading...</div>
+      <div v-if="loading" class="dp-loading">
+        <div class="dp-spinner"></div>
+        Loading...
+      </div>
 
       <div v-else-if="detail" class="dp-body">
-
-        <!-- Species name -->
         <div class="dp-name-block">
           <div class="dp-class-dot" :style="{ background: classColor }"></div>
           <div>
-            <div class="dp-name">{{ detail.detail?.display_name || species.display_name }}</div>
-            <div class="dp-latin">{{ detail.detail?.scientific_name || species.scientific_name }}</div>
+            <div class="dp-name">{{ detail.display_name }}</div>
+            <div class="dp-latin" v-if="detail.common_name">{{ detail.scientific_name }}</div>
           </div>
         </div>
 
-        <!-- IUCN + class -->
         <div class="dp-badges">
-          <span v-if="detail.detail?.iucn_status" class="dp-badge" :style="iucnStyle(detail.detail.iucn_status)">
-            {{ detail.detail.iucn_status }} — {{ iucnLabel(detail.detail.iucn_status) }}
+          <span v-if="detail.iucn_status" class="dp-badge" :style="iucnStyle(detail.iucn_status)">
+            {{ detail.iucn_status }} — {{ iucnLabel(detail.iucn_status) }}
           </span>
-          <span class="dp-class-badge">{{ detail.detail?.class }}</span>
+          <span class="dp-class-badge">{{ detail.class }}</span>
         </div>
 
-        <!-- Stats -->
         <div class="dp-stats">
           <div class="dp-stat">
-            <div class="dp-stat-num">{{ fmt(detail.detail?.sighting_count) }}</div>
+            <div class="dp-stat-num">{{ fmt(detail.sighting_count) }}</div>
             <div class="dp-stat-lbl">sightings</div>
           </div>
           <div class="dp-stat">
             <div class="dp-stat-num">{{ firstYear }}</div>
-            <div class="dp-stat-lbl">first recorded</div>
+            <div class="dp-stat-lbl">first seen</div>
           </div>
           <div class="dp-stat">
             <div class="dp-stat-num">{{ lastYear }}</div>
-            <div class="dp-stat-lbl">last recorded</div>
+            <div class="dp-stat-lbl">last seen</div>
           </div>
         </div>
 
-        <!-- Yearly trend chart -->
         <div class="dp-section" v-if="trendData.length">
           <div class="dp-section-label">Sightings over time</div>
           <div class="trend-bars">
-            <div v-for="t in trendData" :key="t.year" class="t-bar-wrap" :title="`${t.year}: ${t.count}`">
+            <div
+              v-for="t in trendData" :key="t.year"
+              class="t-bar-wrap" :title="`${t.year}: ${t.count}`"
+            >
               <div class="t-bar" :style="{ height: t.pct + '%', background: classColor }"></div>
             </div>
           </div>
           <div class="trend-labels">
             <span>{{ trendData[0]?.year }}</span>
-            <span>{{ trendData[Math.floor(trendData.length/2)]?.year }}</span>
-            <span>{{ trendData[trendData.length-1]?.year }}</span>
+            <span>{{ trendData[Math.floor(trendData.length / 2)]?.year }}</span>
+            <span>{{ trendData[trendData.length - 1]?.year }}</span>
           </div>
         </div>
 
-        <!-- Seasonal chart -->
         <div class="dp-section" v-if="seasonalData.length">
           <div class="dp-section-label">Monthly activity</div>
           <div class="seasonal-bars">
@@ -76,17 +75,24 @@
           </div>
         </div>
 
-        <!-- Taxonomy -->
-        <div class="dp-section">
+        <div class="dp-section" v-if="detail.order_name || detail.family">
           <div class="dp-section-label">Taxonomy</div>
           <div class="dp-tax">
-            <div class="tax-row" v-if="detail.detail?.order_name"><span>Order</span><span>{{ detail.detail.order_name }}</span></div>
-            <div class="tax-row" v-if="detail.detail?.family"><span>Family</span><span>{{ detail.detail.family }}</span></div>
-            <div class="tax-row"><span>Species</span><span class="tax-italic">{{ detail.detail?.scientific_name }}</span></div>
+            <div class="tax-row" v-if="detail.order_name">
+              <span>Order</span><span>{{ detail.order_name }}</span>
+            </div>
+            <div class="tax-row" v-if="detail.family">
+              <span>Family</span><span>{{ detail.family }}</span>
+            </div>
+            <div class="tax-row">
+              <span>Species</span>
+              <span class="tax-italic">{{ detail.scientific_name }}</span>
+            </div>
           </div>
         </div>
-
       </div>
+
+      <div v-else class="dp-loading">No data available</div>
     </div>
   </transition>
 </template>
@@ -101,11 +107,14 @@ const props = defineProps({
 defineEmits(['close'])
 
 const { get } = useApi()
-const detail  = ref(null)
-const loading = ref(false)
+const detail   = ref(null)
+const loading  = ref(false)
 
 const CLASS_COLORS = {
-  Mammalia: '#b05828', Aves: '#4880a8', Reptilia: '#6a9848', Amphibia: '#8858b0'
+  Mammalia: '#b05828',
+  Aves:     '#4880a8',
+  Reptilia: '#6a9848',
+  Amphibia: '#8858b0',
 }
 
 const IUCN_STYLES = {
@@ -117,12 +126,21 @@ const IUCN_STYLES = {
 }
 
 const IUCN_LABELS = {
-  CR: 'Critically endangered', EN: 'Endangered', VU: 'Vulnerable',
-  NT: 'Near threatened', LC: 'Least concern', DD: 'Data deficient'
+  CR: 'Critically endangered',
+  EN: 'Endangered',
+  VU: 'Vulnerable',
+  NT: 'Near threatened',
+  LC: 'Least concern',
+  DD: 'Data deficient',
 }
 
-function iucnStyle(code) { return IUCN_STYLES[code] ?? { background: '#f1efe8', color: '#a09080' } }
-function iucnLabel(code) { return IUCN_LABELS[code] ?? code }
+function iucnStyle(code) {
+  return IUCN_STYLES[code] ?? { background: '#f1efe8', color: '#a09080' }
+}
+
+function iucnLabel(code) {
+  return IUCN_LABELS[code] ?? code
+}
 
 function fmt(n) {
   if (!n) return '—'
@@ -131,51 +149,61 @@ function fmt(n) {
   return n.toLocaleString()
 }
 
-const classColor = computed(() => CLASS_COLORS[detail.value?.detail?.class] ?? '#6a9848')
+const classColor = computed(() =>
+  CLASS_COLORS[detail.value?.class] ?? '#6a9848'
+)
 
 const firstYear = computed(() => {
-  const d = detail.value?.detail?.first_seen
-  return d ? new Date(d).getFullYear() : '—'
+  const t = trendData.value
+  return t.length ? t[0].year : '—'
 })
 
 const lastYear = computed(() => {
-  const d = detail.value?.detail?.last_seen
-  return d ? new Date(d).getFullYear() : '—'
+  const t = trendData.value
+  return t.length ? t[t.length - 1].year : '—'
 })
 
 const trendData = computed(() => {
-  const t = detail.value?.trend ?? []
+  const t   = rawData.value?.trend ?? []
   const max = Math.max(...t.map(x => x.count), 1)
   return t.map(x => ({ ...x, pct: Math.round((x.count / max) * 100) }))
 })
 
 const seasonalData = computed(() => {
   const monthly = Array(12).fill(0)
-  ;(detail.value?.seasonal ?? []).forEach(s => {
+  ;(rawData.value?.seasonal ?? []).forEach(s => {
     if (s.month >= 1 && s.month <= 12) monthly[s.month - 1] += s.count
   })
   const max = Math.max(...monthly, 1)
-  return monthly.map((count, i) => ({ month: i + 1, count, pct: Math.round((count / max) * 100) }))
+  return monthly.map((count, i) => ({
+    month: i + 1, count, pct: Math.round((count / max) * 100)
+  }))
 })
 
+// Raw API response
+const rawData = ref(null)
+
+// immediate: true so it fires when component mounts with an already-set species
 watch(() => props.species, async (sp) => {
-  if (!sp) return
+  if (!sp?.id) return
   loading.value = true
   detail.value  = null
+  rawData.value = null
   try {
-    detail.value = await get(`/api/species/${sp.id}`)
+    const resp = await get(`/api/species/${sp.id}`)
+    rawData.value = resp
+    detail.value  = resp.detail
   } catch (e) {
     console.error('Failed to load species detail:', e)
   } finally {
     loading.value = false
   }
-})
+}, { immediate: true })
 </script>
 
 <style scoped>
 .detail-panel {
-  position: absolute;
-  top: 0; right: 0;
+  position: absolute; top: 0; right: 0;
   width: 270px; height: 100%;
   background: #f0ece0;
   border-left: 0.5px solid rgba(0,0,0,0.09);
@@ -207,9 +235,25 @@ watch(() => props.species, async (sp) => {
   font-size: 11px; color: #908070;
 }
 
-.dp-loading { padding: 20px; font-size: 12px; color: #a09080; text-align: center; }
+.dp-loading {
+  flex: 1; display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 10px; font-size: 12px; color: #a09080;
+}
 
-.dp-body { overflow-y: auto; flex: 1; padding: 14px; display: flex; flex-direction: column; gap: 14px; }
+.dp-spinner {
+  width: 20px; height: 20px; border-radius: 50%;
+  border: 2px solid rgba(0,0,0,0.08);
+  border-top-color: #6a9848;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.dp-body {
+  overflow-y: auto; flex: 1; padding: 14px;
+  display: flex; flex-direction: column; gap: 14px;
+}
 
 .dp-name-block { display: flex; gap: 10px; align-items: flex-start; }
 .dp-class-dot { width: 10px; height: 10px; border-radius: 50%; margin-top: 4px; flex-shrink: 0; }
@@ -231,8 +275,8 @@ watch(() => props.species, async (sp) => {
 .dp-section { display: flex; flex-direction: column; gap: 7px; }
 .dp-section-label { font-size: 10px; font-weight: 500; letter-spacing: 0.8px; color: #a09080; text-transform: uppercase; }
 
-.trend-bars { display: flex; gap: 2px; align-items: flex-end; height: 40px; }
-.t-bar-wrap { flex: 1; height: 100%; display: flex; align-items: flex-end; }
+.trend-bars { display: flex; gap: 2px; align-items: flex-end; height: 44px; }
+.t-bar-wrap { flex: 1; height: 100%; display: flex; align-items: flex-end; cursor: default; }
 .t-bar { width: 100%; border-radius: 1px 1px 0 0; min-height: 2px; opacity: 0.8; }
 .trend-labels { display: flex; justify-content: space-between; font-size: 9px; color: #b0a090; }
 
@@ -242,8 +286,8 @@ watch(() => props.species, async (sp) => {
 .seasonal-labels { display: flex; justify-content: space-between; font-size: 9px; color: #b0a090; }
 
 .dp-tax { display: flex; flex-direction: column; gap: 5px; }
-.tax-row { display: flex; justify-content: space-between; font-size: 11px; }
-.tax-row span:first-child { color: #a09080; }
-.tax-row span:last-child { color: #2a2418; }
+.tax-row { display: flex; justify-content: space-between; font-size: 11px; gap: 8px; }
+.tax-row span:first-child { color: #a09080; flex-shrink: 0; }
+.tax-row span:last-child { color: #2a2418; text-align: right; }
 .tax-italic { font-style: italic; }
 </style>

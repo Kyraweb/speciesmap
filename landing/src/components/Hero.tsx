@@ -156,7 +156,7 @@ export function Hero() {
 
           <div className="relative flex h-full w-full items-center justify-center translate-x-[2%] xl:translate-x-[4%]">
             <div className="relative h-[520px] w-[520px] xl:h-[620px] xl:w-[620px] rounded-full overflow-hidden">
-              <Canvas dpr={[1, 2]} camera={{ position: [0, 0, 4.9], fov: 36 }}>
+              <Canvas dpr={[1, 2]} camera={{ position: [0, 0, 5.5], fov: 36 }}>
                 <ambientLight intensity={0.78} color="#fff7ee" />
                 <hemisphereLight intensity={0.46} color="#fff5e9" groundColor="#dfd0bf" />
                 <directionalLight position={[4.5, 2.5, 5]} intensity={1.95} color="#fff1df" />

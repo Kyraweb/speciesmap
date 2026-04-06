@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.routers import species, sightings, routes, alerts, hex
+from app.routers import species, sightings, routes, alerts, hex, admin
 import os
 
 app = FastAPI(
@@ -31,6 +31,7 @@ app.include_router(sightings.router, prefix="/api")
 app.include_router(routes.router,    prefix="/api")
 app.include_router(alerts.router,    prefix="/api")
 app.include_router(hex.router,       prefix="/api")
+app.include_router(admin.router)
 
 
 @app.get("/health")

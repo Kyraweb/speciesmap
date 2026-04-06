@@ -6,14 +6,11 @@
       <div class="loading-pill">Loading sightings...</div>
     </div>
 
-    <!-- Popup on hover -->
     <div v-if="popup" class="map-popup" :style="{ left: popup.x + 'px', top: popup.y + 'px' }">
       <div class="popup-name">{{ popup.display_name }}</div>
       <div class="popup-latin" v-if="popup.common_name">{{ popup.scientific_name }}</div>
       <div class="popup-row">
-        <span v-if="popup.iucn_status" class="popup-badge" :style="iucnStyle(popup.iucn_status)">
-          {{ popup.iucn_status }}
-        </span>
+        <span v-if="popup.iucn_status" class="popup-badge" :style="iucnStyle(popup.iucn_status)">{{ popup.iucn_status }}</span>
         <span class="popup-class">{{ popup.class }}</span>
       </div>
       <div class="popup-hint">Click for details →</div>
@@ -37,7 +34,13 @@ const emit = defineEmits(['select-species'])
 const { slug } = useContinent()
 const mapContainer = ref(null)
 const popup        = ref(null)
-let map            = null
+let map = null
+
+const CLASSES = [
+  { key: 'Mammalia', color: '#b05828', outline: '#8a3810' },
+  { key: 'Reptilia', color: '#6a9848', outline: '#4a7028' },
+  { key: 'Amphibia', color: '#8858b0', outline: '#683890' },
+]
 
 const CONTINENT_BOUNDS = {
   northamerica: [-172.0,   5.0,  -48.0,  86.0],
@@ -69,163 +72,151 @@ function iucnStyle(code) {
   return IUCN_STYLES[code] ?? { background: '#f1efe8', color: '#a09080' }
 }
 
-function classColor(cls) {
-  return {
-    Mammalia: '#b05828',
-    Reptilia: '#6a9848',
-    Amphibia: '#8858b0',
-    Aves:     '#4880a8',
-  }[cls] ?? '#a09080'
-}
-
-function buildGeoJSON(sightings) {
+function buildGeoJSON(sightings, classKey) {
   return {
     type: 'FeatureCollection',
-    features: sightings.map(s => ({
-      type: 'Feature',
-      geometry: { type: 'Point', coordinates: [s.lng, s.lat] },
-      properties: {
-        id:              s.id,
-        species_id:      s.species_id,
-        display_name:    s.display_name || s.scientific_name,
-        common_name:     s.common_name,
-        scientific_name: s.scientific_name,
-        class:           s.class,
-        iucn_status:     s.iucn_status,
-        color:           classColor(s.class),
-        country:         s.country,
-        observed_at:     s.observed_at,
-      }
-    }))
+    features: sightings
+      .filter(s => s.class === classKey)
+      .map(s => ({
+        type: 'Feature',
+        geometry: { type: 'Point', coordinates: [s.lng, s.lat] },
+        properties: {
+          id:              s.id,
+          species_id:      s.species_id,
+          display_name:    s.display_name || s.scientific_name,
+          common_name:     s.common_name,
+          scientific_name: s.scientific_name,
+          class:           s.class,
+          iucn_status:     s.iucn_status,
+          country:         s.country,
+        }
+      }))
   }
 }
 
-function addLayers() {
-  if (!map) return
+function addClassLayers(cls) {
+  const sourceId    = `sightings-${cls.key}`
+  const clusterId   = `clusters-${cls.key}`
+  const countId     = `cluster-count-${cls.key}`
+  const pointId     = `points-${cls.key}`
 
-  // Remove existing layers/source if present
-  ['clusters', 'cluster-count', 'unclustered'].forEach(id => {
-    if (map.getLayer(id)) map.removeLayer(id)
-  })
-  if (map.getSource('sightings')) map.removeSource('sightings')
+  if (map.getSource(sourceId)) return
 
-  const geojson = buildGeoJSON(props.sightings)
-
-  map.addSource('sightings', {
-    type: 'geojson',
-    data: geojson,
-    cluster: true,
-    clusterMaxZoom: 9,   // Stop clustering at zoom 9
-    clusterRadius:  60,  // Cluster radius in pixels
+  map.addSource(sourceId, {
+    type:          'geojson',
+    data:          buildGeoJSON(props.sightings, cls.key),
+    cluster:       true,
+    clusterMaxZoom: 9,
+    clusterRadius:  50,
   })
 
-  // Cluster circles — size and color by point count
+  // Cluster circles
   map.addLayer({
-    id: 'clusters',
+    id: clusterId,
     type: 'circle',
-    source: 'sightings',
+    source: sourceId,
     filter: ['has', 'point_count'],
     paint: {
-      'circle-color': [
-        'step', ['get', 'point_count'],
-        '#d4c8b0',   //   < 10
-        10,  '#c8b898',   //  10-50
-        50,  '#b8a878',   //  50-200
-        200, '#a09050',   // 200-500
-        500, '#886830',   // 500+
-      ],
+      'circle-color': cls.color,
       'circle-radius': [
         'step', ['get', 'point_count'],
-        14,     //   < 10
-        10, 20, //  10-50
-        50, 28, //  50-200
-        200, 36, // 200-500
-        500, 46, // 500+
+        12,       //  < 10
+        10,  18,  //  10 - 50
+        50,  26,  //  50 - 200
+        200, 34,  // 200 - 500
+        500, 44,  // 500+
       ],
-      'circle-stroke-width': 1.5,
-      'circle-stroke-color': '#f0ece0',
-      'circle-stroke-opacity': 0.7,
-      'circle-opacity': 0.85,
+      'circle-opacity':       0.82,
+      'circle-stroke-width':  1.5,
+      'circle-stroke-color':  cls.outline,
+      'circle-stroke-opacity': 0.6,
     }
   })
 
   // Cluster count labels
   map.addLayer({
-    id: 'cluster-count',
+    id: countId,
     type: 'symbol',
-    source: 'sightings',
+    source: sourceId,
     filter: ['has', 'point_count'],
     layout: {
       'text-field': [
         'case',
         ['>=', ['get', 'point_count'], 1000],
-        ['concat', ['to-string', ['/', ['get', 'point_count'], 1000]], 'k'],
+        ['concat', ['to-string', ['round', ['/', ['get', 'point_count'], 1000]]], 'k'],
         ['to-string', ['get', 'point_count']]
       ],
-      'text-font':  ['Open Sans Semibold', 'Arial Unicode MS Bold'],
-      'text-size':  11,
+      'text-font': ['Open Sans Semibold', 'Arial Unicode MS Bold'],
+      'text-size': 10,
     },
     paint: {
-      'text-color': '#3a2818',
+      'text-color': '#ffffff',
+      'text-halo-color': 'rgba(0,0,0,0.2)',
+      'text-halo-width': 0.5,
     }
   })
 
-  // Individual unclustered points
+  // Individual points (unclustered)
   map.addLayer({
-    id:     'unclustered',
-    type:   'circle',
-    source: 'sightings',
+    id: pointId,
+    type: 'circle',
+    source: sourceId,
     filter: ['!', ['has', 'point_count']],
     paint: {
-      'circle-color':        ['get', 'color'],
-      'circle-radius':       ['interpolate', ['linear'], ['zoom'], 6, 4, 10, 7, 14, 10],
-      'circle-opacity':      0.85,
-      'circle-stroke-width': 1,
-      'circle-stroke-color': '#ffffff',
+      'circle-color':          cls.color,
+      'circle-radius':         ['interpolate', ['linear'], ['zoom'], 7, 4, 10, 6, 14, 9],
+      'circle-opacity':        0.85,
+      'circle-stroke-width':   1,
+      'circle-stroke-color':   '#ffffff',
       'circle-stroke-opacity': 0.5,
     }
   })
-}
 
-function setupEvents() {
-  // Click cluster → zoom in
-  map.on('click', 'clusters', (e) => {
-    const features = map.queryRenderedFeatures(e.point, { layers: ['clusters'] })
-    const clusterId = features[0].properties.cluster_id
-    map.getSource('sightings').getClusterExpansionZoom(clusterId, (err, zoom) => {
+  // Cluster click → zoom in
+  map.on('click', clusterId, (e) => {
+    const clusterId2 = e.features[0].properties.cluster_id
+    map.getSource(sourceId).getClusterExpansionZoom(clusterId2, (err, zoom) => {
       if (err) return
-      map.easeTo({ center: features[0].geometry.coordinates, zoom: zoom + 0.5 })
+      map.easeTo({ center: e.features[0].geometry.coordinates, zoom: zoom + 0.5 })
     })
   })
 
-  // Hover on unclustered points
-  map.on('mousemove', 'unclustered', (e) => {
+  // Point hover
+  map.on('mousemove', pointId, (e) => {
     map.getCanvas().style.cursor = 'pointer'
     const p = e.features[0].properties
     popup.value = { x: e.point.x + 14, y: e.point.y - 12, ...p }
   })
-
-  map.on('mouseleave', 'unclustered', () => {
+  map.on('mouseleave', pointId, () => {
     map.getCanvas().style.cursor = ''
     popup.value = null
   })
 
-  // Hover on clusters
-  map.on('mouseenter', 'clusters', () => { map.getCanvas().style.cursor = 'pointer' })
-  map.on('mouseleave', 'clusters', () => { map.getCanvas().style.cursor = '' })
+  // Cluster hover cursor
+  map.on('mouseenter', clusterId, () => { map.getCanvas().style.cursor = 'pointer' })
+  map.on('mouseleave', clusterId, () => { map.getCanvas().style.cursor = '' })
 
-  // Click unclustered → select species
-  map.on('click', 'unclustered', (e) => {
+  // Point click → select species
+  map.on('click', pointId, (e) => {
     emit('select-species', e.features[0].properties)
     popup.value = null
   })
+}
 
-  map.on('click', () => { popup.value = null })
+function updateSources() {
+  if (!map || !map.isStyleLoaded()) return
+  CLASSES.forEach(cls => {
+    const sourceId = `sightings-${cls.key}`
+    if (map.getSource(sourceId)) {
+      map.getSource(sourceId).setData(buildGeoJSON(props.sightings, cls.key))
+    } else {
+      addClassLayers(cls)
+    }
+  })
 }
 
 onMounted(() => {
   maptilersdk.config.apiKey = import.meta.env.VITE_MAPTILER_KEY ?? ''
-
   const bounds = CONTINENT_BOUNDS[slug] ?? CONTINENT_BOUNDS.northamerica
   const view   = CONTINENT_VIEW[slug]   ?? CONTINENT_VIEW.northamerica
 
@@ -245,26 +236,17 @@ onMounted(() => {
   map.addControl(new maptilersdk.NavigationControl(), 'bottom-right')
 
   map.on('load', () => {
-    if (props.sightings.length > 0) {
-      addLayers()
-      setupEvents()
-    }
+    if (props.sightings.length > 0) updateSources()
   })
+
+  map.on('click', () => { popup.value = null })
 })
 
 onUnmounted(() => { if (map) map.remove() })
 
-watch(() => props.sightings, (newSightings) => {
+watch(() => props.sightings, () => {
   if (!map || !map.isStyleLoaded()) return
-  if (newSightings.length === 0) return
-
-  if (map.getSource('sightings')) {
-    // Update existing source data — clusters update automatically
-    map.getSource('sightings').setData(buildGeoJSON(newSightings))
-  } else {
-    addLayers()
-    setupEvents()
-  }
+  updateSources()
 }, { deep: false })
 </script>
 
@@ -277,7 +259,6 @@ watch(() => props.sightings, (newSightings) => {
   display: flex; align-items: center; justify-content: center;
   pointer-events: none; z-index: 5;
 }
-
 .loading-pill {
   background: rgba(240,236,224,0.92);
   border: 0.5px solid rgba(0,0,0,0.1);
@@ -287,13 +268,11 @@ watch(() => props.sightings, (newSightings) => {
 
 .map-popup {
   position: absolute;
-  background: #f8f4e8;
-  border: 0.5px solid rgba(176,88,40,0.4);
+  background: #f8f4e8; border: 0.5px solid rgba(176,88,40,0.4);
   border-radius: 4px; padding: 10px 12px;
   pointer-events: none; z-index: 10;
   min-width: 160px; max-width: 220px;
 }
-
 .popup-name  { font-family: Georgia, serif; font-size: 13px; color: #2a2418; margin-bottom: 2px; line-height: 1.3; }
 .popup-latin { font-size: 10px; color: #a09080; font-style: italic; margin-bottom: 6px; }
 .popup-row   { display: flex; align-items: center; gap: 6px; margin-bottom: 5px; }
